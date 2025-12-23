@@ -144,6 +144,16 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_MENU_SHOW, items),
   },
 
+  // App Detector
+  appDetector: {
+    detectApps: (): Promise<DetectedApp[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_DETECT),
+    openWith: (path: string, bundleId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_WITH, path, bundleId),
+    getIcon: (bundleId: string): Promise<string | undefined> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_ICON, bundleId),
+  },
+
   // Environment
   env: {
     HOME: process.env.HOME || process.env.USERPROFILE || '',

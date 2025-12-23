@@ -18,9 +18,9 @@ import {
   Paperclip,
   Mic,
   ArrowUp,
-  Share2,
   FolderOpen,
 } from 'lucide-react';
+import { OpenInMenu } from '@/components/app/OpenInMenu';
 
 const buttonVariants = {
   initial: { scale: 0, opacity: 0 },
@@ -147,16 +147,9 @@ export function MainContent({
           </button>
         </div>
 
-        {/* Right: Session info */}
+        {/* Right: Open In Menu */}
         <div className="flex items-center gap-2 no-drag">
-          <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Claude</span>
-          </div>
-          <Button variant="ghost" size="sm" className="gap-1.5">
-            <Share2 className="h-4 w-4" />
-          </Button>
+          <OpenInMenu path={worktreePath} />
         </div>
       </header>
 

@@ -51,6 +51,11 @@ export const IPC_CHANNELS = {
 
   // Context Menu
   CONTEXT_MENU_SHOW: 'contextMenu:show',
+
+  // App Detector
+  APP_DETECT: 'app:detect',
+  APP_OPEN_WITH: 'app:openWith',
+  APP_GET_ICON: 'app:getIcon',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
