@@ -310,12 +310,24 @@ export function useXterm({
     // Custom key handler
     terminal.attachCustomKeyEventHandler((event) => {
       // Let tab management shortcuts bubble up to window handlers
+      // Only match exact modifier combinations (no extra Shift/Alt)
       // Cmd/Ctrl+T (new tab), Cmd/Ctrl+W (close tab), Ctrl+[ (prev tab), Ctrl+] (next tab)
-      if ((event.ctrlKey || event.metaKey) && ['t', 'w', '[', ']'].includes(event.key)) {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        ['t', 'w', '[', ']'].includes(event.key)
+      ) {
         return false;
       }
       // Cmd/Ctrl+1-9 (switch to tab by number)
-      if ((event.metaKey || event.ctrlKey) && event.key >= '1' && event.key <= '9') {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key >= '1' &&
+        event.key <= '9'
+      ) {
         return false;
       }
 
