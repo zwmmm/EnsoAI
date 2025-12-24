@@ -160,7 +160,7 @@ export function MainContent({
         </div>
         {/* File tab - keep mounted to preserve editor state */}
         <div className={cn('absolute inset-0', activeTab !== 'file' && 'invisible')}>
-          <FilePanel rootPath={worktreePath} />
+          <FilePanel rootPath={worktreePath} isActive={activeTab === 'file'} />
         </div>
         {activeTab === 'source-control' && <SourceControlPlaceholder />}
       </div>

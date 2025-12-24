@@ -151,14 +151,28 @@ export function useXterm({
   }, []);
 
   const findNext = useCallback(
-    (term: string, options?: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean }) => {
+    (
+      term: string,
+      options?: {
+        caseSensitive?: boolean;
+        wholeWord?: boolean;
+        regex?: boolean;
+      }
+    ) => {
       return searchAddonRef.current?.findNext(term, options) ?? false;
     },
     []
   );
 
   const findPrevious = useCallback(
-    (term: string, options?: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean }) => {
+    (
+      term: string,
+      options?: {
+        caseSensitive?: boolean;
+        wholeWord?: boolean;
+        regex?: boolean;
+      }
+    ) => {
       return searchAddonRef.current?.findPrevious(term, options) ?? false;
     },
     []
@@ -233,7 +247,10 @@ export function useXterm({
 
         const lineText = line.translateToString();
         const links: Array<{
-          range: { start: { x: number; y: number }; end: { x: number; y: number } };
+          range: {
+            start: { x: number; y: number };
+            end: { x: number; y: number };
+          };
           text: string;
           activate: () => void;
         }> = [];
@@ -292,6 +309,28 @@ export function useXterm({
 
     // Custom key handler
     terminal.attachCustomKeyEventHandler((event) => {
+      // Let tab management shortcuts bubble up to window handlers
+      // Only match exact modifier combinations (no extra Shift/Alt)
+      // Cmd/Ctrl+T (new tab), Cmd/Ctrl+W (close tab), Ctrl+[ (prev tab), Ctrl+] (next tab)
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        ['t', 'w', '[', ']'].includes(event.key)
+      ) {
+        return false;
+      }
+      // Cmd/Ctrl+1-9 (switch to tab by number)
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key >= '1' &&
+        event.key <= '9'
+      ) {
+        return false;
+      }
+
       if (ptyIdRef.current && onCustomKeyRef.current) {
         return onCustomKeyRef.current(event, ptyIdRef.current);
       }
@@ -352,7 +391,7 @@ export function useXterm({
               writeBufferRef.current = '';
             }
             onExitRef.current?.();
-          }, 50);
+          }, 30);
         }
       });
       exitCleanupRef.current = exitCleanup;

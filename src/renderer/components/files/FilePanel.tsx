@@ -7,11 +7,12 @@ import { NewItemDialog } from './NewItemDialog';
 
 interface FilePanelProps {
   rootPath: string | undefined;
+  isActive?: boolean;
 }
 
 type NewItemType = 'file' | 'directory' | null;
 
-export function FilePanel({ rootPath }: FilePanelProps) {
+export function FilePanel({ rootPath, isActive = false }: FilePanelProps) {
   const {
     tree,
     isLoading,
@@ -44,6 +45,8 @@ export function FilePanel({ rootPath }: FilePanelProps) {
   // Cmd+W: close tab, Cmd+1-9: switch tab
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActive) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault();
         if (activeTab) {
@@ -60,7 +63,7 @@ export function FilePanel({ rootPath }: FilePanelProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tabs, activeTab, closeFile, setActiveFile]);
+  }, [isActive, tabs, activeTab, closeFile, setActiveFile]);
 
   // Handle file click (single click = open in editor)
   const handleFileClick = useCallback(

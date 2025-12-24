@@ -710,6 +710,54 @@ function KeybindingsSettings() {
         <p className="text-sm text-muted-foreground mb-4">设置终端快捷键</p>
         <div className="space-y-3">
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">新建标签</span>
+            <KeybindingInput
+              value={terminalKeybindings.newTab}
+              onChange={(binding) => {
+                setTerminalKeybindings({
+                  ...terminalKeybindings,
+                  newTab: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">关闭标签</span>
+            <KeybindingInput
+              value={terminalKeybindings.closeTab}
+              onChange={(binding) => {
+                setTerminalKeybindings({
+                  ...terminalKeybindings,
+                  closeTab: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">下一个标签</span>
+            <KeybindingInput
+              value={terminalKeybindings.nextTab}
+              onChange={(binding) => {
+                setTerminalKeybindings({
+                  ...terminalKeybindings,
+                  nextTab: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="text-sm">上一个标签</span>
+            <KeybindingInput
+              value={terminalKeybindings.prevTab}
+              onChange={(binding) => {
+                setTerminalKeybindings({
+                  ...terminalKeybindings,
+                  prevTab: binding,
+                });
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
             <span className="text-sm">清除终端</span>
             <KeybindingInput
               value={terminalKeybindings.clear}
