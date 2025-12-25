@@ -28,10 +28,14 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.inputs.tag }}"
           else
-            echo "name=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.release.tag_name }}"
           fi
+          echo "name=$TAG" >> $GITHUB_OUTPUT
+          # 去掉 v 前缀作为版本号
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Get Previous Tag
         id: prev_tag
@@ -42,7 +46,6 @@ jobs:
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
-          echo "Current: $CURRENT_TAG, Previous: $PREV_TAG"
 
       - name: Get Commits
         id: commits
@@ -53,76 +56,84 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Generate Release Notes
-        uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-          settings: |
-            {
-              "env": {
-                "ANTHROPIC_BASE_URL": "${{ secrets.ANTHROPIC_BASE_URL }}",
-                "ANTHROPIC_AUTH_TOKEN": "${{ secrets.ANTHROPIC_AUTH_TOKEN }}",
-                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-              }
-            }
-          prompt: |
-            请为 GitHub Release 生成中文发布说明。
+        id: generate
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VERSION="${{ steps.tag.outputs.version }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          COMMITS='${{ steps.commits.outputs.commits }}'
 
-            **版本**: ${{ steps.tag.outputs.name }}
-            **仓库**: ${{ github.repository }}
+          # 解析 commits 并分类
+          FEATURES=""
+          FIXES=""
+          CICD=""
+          CHORES=""
 
-            **本次发布包含的 Commits**:
-            ```
-            ${{ steps.commits.outputs.commits }}
-            ```
+          while IFS= read -r line; do
+            if [[ -z "$line" ]]; then continue; fi
 
-            **要求**:
-            1. 使用中文撰写
-            2. 按照以下分类整理 commits:
-               - ✨ Features (feat): 新功能
-               - 🐛 Bug Fixes (fix): 修复
-               - 🔧 Improvements (refactor/perf/style): 优化改进
-               - 🔨 CI/CD (ci/build): 构建部署
-               - 📝 Documentation (docs): 文档
-               - 🧹 Chores (chore): 其他
-            3. 只保留有实际内容的分类，空分类不显示
-            4. 每条记录简洁明了，突出变更要点
-            5. 末尾添加 Full Changelog 链接
+            # 提取 commit message（去掉 hash）
+            MSG=$(echo "$line" | sed 's/ ([a-f0-9]*)$//')
 
-            **输出格式** (版本号用实际的 ${{ steps.tag.outputs.name }} 替换，去掉 v 前缀作为文件版本号):
-            ```markdown
-            ## What's Changed
+            if [[ "$line" =~ ^-\ feat ]]; then
+              # 提取描述部分
+              DESC=$(echo "$MSG" | sed 's/^- feat[^:]*: //')
+              FEATURES="${FEATURES}- **${DESC}**\n"
+            elif [[ "$line" =~ ^-\ fix ]]; then
+              DESC=$(echo "$MSG" | sed 's/^- fix[^:]*: //')
+              FIXES="${FIXES}- **${DESC}**\n"
+            elif [[ "$line" =~ ^-\ ci ]] || [[ "$line" =~ ^-\ build ]]; then
+              DESC=$(echo "$MSG" | sed 's/^- \(ci\|build\)[^:]*: //')
+              CICD="${CICD}- ${DESC}\n"
+            elif [[ "$line" =~ ^-\ chore ]]; then
+              # 跳过 release commit
+              if [[ ! "$line" =~ release ]]; then
+                DESC=$(echo "$MSG" | sed 's/^- chore[^:]*: //')
+                CHORES="${CHORES}- ${DESC}\n"
+              fi
+            fi
+          done <<< "$COMMITS"
 
-            ### ✨ Features
-            - **功能名称**: 简短描述
+          # 构建 release notes
+          NOTES="## What's Changed\n\n"
 
-            ### 🐛 Bug Fixes
-            - **修复内容**: 简短描述
+          if [[ -n "$FEATURES" ]]; then
+            NOTES="${NOTES}### ✨ Features\n${FEATURES}\n"
+          fi
 
-            ---
+          if [[ -n "$FIXES" ]]; then
+            NOTES="${NOTES}### 🐛 Bug Fixes\n${FIXES}\n"
+          fi
 
-            ## 📦 下载
+          if [[ -n "$CICD" ]]; then
+            NOTES="${NOTES}### 🔨 CI/CD\n${CICD}\n"
+          fi
 
-            | 平台 | 文件 |
-            |------|------|
-            | macOS (Apple Silicon) | [EnsoAI-{VERSION}-arm64.dmg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.name }}/EnsoAI-{VERSION}-arm64.dmg) |
-            | macOS (Intel) | [EnsoAI-{VERSION}.dmg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.name }}/EnsoAI-{VERSION}.dmg) |
-            | Windows (x64 安装版) | [EnsoAI-Setup-{VERSION}.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.name }}/EnsoAI-Setup-{VERSION}.exe) |
+          if [[ -n "$CHORES" ]]; then
+            NOTES="${NOTES}### 🧹 Chores\n${CHORES}\n"
+          fi
 
-            > ⚠️ **macOS 用户注意**: 由于应用未签名，首次打开可能提示"已损坏"，请在终端执行以下命令：
-            > ```bash
-            > sudo xattr -dr com.apple.quarantine /Applications/EnsoAI.app
-            > ```
+          # 添加下载部分
+          NOTES="${NOTES}---\n\n"
+          NOTES="${NOTES}## 📦 下载\n\n"
+          NOTES="${NOTES}| 平台 | 文件 |\n"
+          NOTES="${NOTES}|------|------|\n"
+          NOTES="${NOTES}| macOS (Apple Silicon) | [EnsoAI-${VERSION}-arm64.dmg](https://github.com/${{ github.repository }}/releases/download/${TAG}/EnsoAI-${VERSION}-arm64.dmg) |\n"
+          NOTES="${NOTES}| macOS (Intel) | [EnsoAI-${VERSION}.dmg](https://github.com/${{ github.repository }}/releases/download/${TAG}/EnsoAI-${VERSION}.dmg) |\n"
+          NOTES="${NOTES}| Windows (x64 安装版) | [EnsoAI-Setup-${VERSION}.exe](https://github.com/${{ github.repository }}/releases/download/${TAG}/EnsoAI-Setup-${VERSION}.exe) |\n\n"
+          NOTES="${NOTES}> ⚠️ **macOS 用户注意**: 由于应用未签名，首次打开可能提示\"已损坏\"，请在终端执行以下命令：\n"
+          NOTES="${NOTES}> \`\`\`bash\n"
+          NOTES="${NOTES}> sudo xattr -dr com.apple.quarantine /Applications/EnsoAI.app\n"
+          NOTES="${NOTES}> \`\`\`\n\n"
+          NOTES="${NOTES}---\n\n"
+          NOTES="${NOTES}**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}"
 
-            ---
+          # 写入文件
+          echo -e "$NOTES" > /tmp/release-notes.md
+          cat /tmp/release-notes.md
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev_tag }}...${{ steps.tag.outputs.name }}
-            ```
-
-            生成后，使用 gh 命令更新 release:
-            ```bash
-            gh release edit ${{ steps.tag.outputs.name }} --notes "生成的内容"
-            ```
-
-            请直接执行，不要询问确认。
+      - name: Update Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit ${{ steps.tag.outputs.name }} --notes-file /tmp/release-notes.md
