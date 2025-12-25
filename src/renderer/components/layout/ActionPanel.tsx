@@ -1,3 +1,4 @@
+import type { GitWorktree } from '@shared/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
@@ -101,9 +102,12 @@ interface ActionPanelProps {
   workspaceCollapsed: boolean;
   worktreeCollapsed: boolean;
   projectPath?: string;
+  worktrees?: GitWorktree[];
+  activeWorktreePath?: string;
   onToggleWorkspace: () => void;
   onToggleWorktree: () => void;
   onOpenSettings: () => void;
+  onSwitchWorktree?: (worktree: GitWorktree) => void;
 }
 
 interface ActionItem {
@@ -127,9 +131,12 @@ export function ActionPanel({
   workspaceCollapsed,
   worktreeCollapsed,
   projectPath,
+  worktrees = [],
+  activeWorktreePath,
   onToggleWorkspace,
   onToggleWorktree,
   onOpenSettings,
+  onSwitchWorktree,
 }: ActionPanelProps) {
   const [search, setSearch] = React.useState('');
   const [selectedIndex, setSelectedIndex] = React.useState(0);
@@ -201,6 +208,24 @@ export function ActionPanel({
       },
     ];
 
+    // Add "Switch Worktree" group
+    if (worktrees.length > 1 && onSwitchWorktree) {
+      const switchableWorktrees = worktrees.filter((wt) => wt.path !== activeWorktreePath);
+      if (switchableWorktrees.length > 0) {
+        groups.push({
+          label: '切换 Worktree',
+          items: switchableWorktrees.map((wt) => ({
+            id: `switch-worktree-${wt.path}`,
+            label: `切换到 ${wt.branch || wt.path.split('/').pop()}`,
+            icon: GitBranch,
+            action: () => {
+              onSwitchWorktree(wt);
+            },
+          })),
+        });
+      }
+    }
+
     // Add "Open in XXX" group for detected apps
     if (projectPath && detectedApps.length > 0) {
       groups.push({
@@ -221,11 +246,14 @@ export function ActionPanel({
     workspaceCollapsed,
     worktreeCollapsed,
     projectPath,
+    worktrees,
+    activeWorktreePath,
     detectedApps,
     cliStatus,
     onToggleWorkspace,
     onToggleWorktree,
     onOpenSettings,
+    onSwitchWorktree,
     openWith,
     cliInstall,
     cliUninstall,

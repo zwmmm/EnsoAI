@@ -638,9 +638,12 @@ export default function App() {
         workspaceCollapsed={workspaceCollapsed}
         worktreeCollapsed={worktreeCollapsed}
         projectPath={activeWorktree?.path || selectedRepo || undefined}
+        worktrees={worktrees}
+        activeWorktreePath={activeWorktree?.path}
         onToggleWorkspace={() => setWorkspaceCollapsed((prev) => !prev)}
         onToggleWorktree={() => setWorktreeCollapsed((prev) => !prev)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onSwitchWorktree={handleSelectWorktree}
       />
 
       {/* Update Notification */}
