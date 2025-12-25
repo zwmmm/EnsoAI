@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
-import { IPC_CHANNELS } from '@shared/types';
 import { type Locale, normalizeLocale } from '@shared/i18n';
-import { app, BrowserWindow, Menu, ipcMain } from 'electron';
+import { IPC_CHANNELS } from '@shared/types';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import { cleanupAllResources, registerIpcHandlers } from './ipc';
 import { checkGitInstalled } from './services/git/checkGit';
 import { setCurrentLocale } from './services/i18n';
@@ -96,20 +96,23 @@ app.on('open-url', (event, url) => {
   }
 });
 
-// Windows/Linux: Handle second instance
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on('second-instance', (_, commandLine) => {
-    // Focus existing window
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-    // Handle command line from second instance
-    handleCommandLineArgs(commandLine);
-  });
+// Windows/Linux: Handle second instance (skip in dev mode to allow multiple instances)
+const isDev = !app.isPackaged;
+if (!isDev) {
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', (_, commandLine) => {
+      // Focus existing window
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+      // Handle command line from second instance
+      handleCommandLineArgs(commandLine);
+    });
+  }
 }
 
 function readStoredLanguage(): Locale {

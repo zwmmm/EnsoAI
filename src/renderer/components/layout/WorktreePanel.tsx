@@ -6,7 +6,10 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
+  Terminal,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -30,6 +33,7 @@ import { toastManager } from '@/components/ui/toast';
 import { CreateWorktreeDialog } from '@/components/worktree/CreateWorktreeDialog';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
 
 interface WorktreePanelProps {
   worktrees: GitWorktree[];
@@ -258,7 +262,9 @@ export function WorktreePanel({
                 </span>
               ) : (
                 <span className="block mt-2 text-destructive">
-                  {t('This will delete the directory and all files inside. This action cannot be undone!')}
+                  {t(
+                    'This will delete the directory and all files inside. This action cannot be undone!'
+                  )}
                 </span>
               )}
             </AlertDialogDescription>
@@ -319,7 +325,9 @@ export function WorktreePanel({
                       type: 'error',
                       title: t('Delete failed'),
                       description: hasUncommitted
-                        ? t('This directory contains uncommitted changes. Please check "Force delete".')
+                        ? t(
+                            'This directory contains uncommitted changes. Please check "Force delete".'
+                          )
                         : message,
                     });
                   } finally {
@@ -352,6 +360,13 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
     worktree.isMainWorktree || worktree.branch === 'main' || worktree.branch === 'master';
   const branchDisplay = worktree.branch || t('Detached');
   const isPrunable = worktree.prunable;
+
+  // Subscribe to activity store
+  const activities = useWorktreeActivityStore((s) => s.activities);
+  const activity = activities[worktree.path] || { agentCount: 0, terminalCount: 0 };
+  const closeAgentSessions = useWorktreeActivityStore((s) => s.closeAgentSessions);
+  const closeTerminalSessions = useWorktreeActivityStore((s) => s.closeTerminalSessions);
+  const hasActivity = activity.agentCount > 0 || activity.terminalCount > 0;
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -395,6 +410,13 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
               {t('Main')}
             </span>
           ) : null}
+          {/* Activity indicator - green dot */}
+          {hasActivity && (
+            <span
+              className="ml-auto h-2 w-2 shrink-0 rounded-full bg-emerald-500 animate-pulse"
+              title={t('Active sessions')}
+            />
+          )}
         </div>
 
         {/* Path */}
@@ -407,6 +429,24 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
         >
           {worktree.path}
         </div>
+
+        {/* Activity counts */}
+        {hasActivity && (
+          <div className="flex items-center gap-3 pl-6 text-xs text-muted-foreground">
+            {activity.agentCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                {activity.agentCount}
+              </span>
+            )}
+            {activity.terminalCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Terminal className="h-3 w-3" />
+                {activity.terminalCount}
+              </span>
+            )}
+          </div>
+        )}
       </button>
 
       {/* Context Menu */}
@@ -423,9 +463,45 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
             role="presentation"
           />
           <div
-            className="fixed z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg"
+            className="fixed z-50 min-w-40 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >
+            {/* Close Agent Sessions */}
+            {activity.agentCount > 0 && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                onClick={() => {
+                  setMenuOpen(false);
+                  closeAgentSessions(worktree.path);
+                }}
+              >
+                <X className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
+                {t('Close Agent Sessions')}
+              </button>
+            )}
+
+            {/* Close Terminal Sessions */}
+            {activity.terminalCount > 0 && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                onClick={() => {
+                  setMenuOpen(false);
+                  closeTerminalSessions(worktree.path);
+                }}
+              >
+                <X className="h-4 w-4" />
+                <Terminal className="h-4 w-4" />
+                {t('Close Terminal Sessions')}
+              </button>
+            )}
+
+            {/* Separator if there are activity options */}
+            {hasActivity && <div className="my-1 h-px bg-border" />}
+
+            {/* Delete Worktree */}
             <button
               type="button"
               className={cn(

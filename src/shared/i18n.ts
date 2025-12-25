@@ -269,6 +269,7 @@ export const zhTranslations: Record<string, string> = {
   '(staged)': '(已暂存)',
   '(unstaged)': '(未暂存)',
   Active: '活跃',
+  'Active sessions': '活跃会话',
   'Add a Git repository from a local folder to get started': '从本地文件夹添加 Git 仓库开始使用',
   'Best performance (recommended)': '性能最佳，推荐',
   'Bright theme': '明亮的界面主题',
@@ -278,6 +279,8 @@ export const zhTranslations: Record<string, string> = {
   'Clean up records': '清理记录',
   'Click the button in the top right to create your first worktree':
     '点击右上角按钮创建第一个 Worktree',
+  'Close Agent Sessions': '关闭 Agent 会话',
+  'Close Terminal Sessions': '关闭终端会话',
   'Confirm exit': '确认退出',
   'Create your first worktree to get started': '创建第一个 Worktree 开始工作',
   'Creating...': '创建中...',
