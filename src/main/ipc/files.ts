@@ -104,3 +104,12 @@ export function registerFileHandlers(): void {
     }
   });
 }
+
+export async function stopAllFileWatchers(): Promise<void> {
+  const stopPromises: Promise<void>[] = [];
+  for (const watcher of watchers.values()) {
+    stopPromises.push(watcher.stop());
+  }
+  await Promise.all(stopPromises);
+  watchers.clear();
+}

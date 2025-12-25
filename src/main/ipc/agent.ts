@@ -6,6 +6,10 @@ import { AgentSessionManager } from '../services/agent/AgentSession';
 const registry = new AgentRegistry(BUILTIN_AGENTS);
 const sessionManager = new AgentSessionManager();
 
+export function stopAllAgentSessions(): void {
+  sessionManager.stopAll();
+}
+
 export function registerAgentHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AGENT_LIST, async () => {
     return registry.list();

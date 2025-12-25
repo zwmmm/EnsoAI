@@ -8,6 +8,10 @@ import { PtyManager } from '../services/terminal/PtyManager';
 
 const ptyManager = new PtyManager();
 
+export function destroyAllTerminals(): void {
+  ptyManager.destroyAll();
+}
+
 export function registerTerminalHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_CREATE,

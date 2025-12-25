@@ -15,6 +15,14 @@ function getWorktreeService(workdir: string): WorktreeService {
   return worktreeServices.get(workdir)!;
 }
 
+export function clearWorktreeService(workdir: string): void {
+  worktreeServices.delete(workdir);
+}
+
+export function clearAllWorktreeServices(): void {
+  worktreeServices.clear();
+}
+
 export function registerWorktreeHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.WORKTREE_LIST, async (_, workdir: string) => {
     const service = getWorktreeService(workdir);

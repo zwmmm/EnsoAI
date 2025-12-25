@@ -411,8 +411,8 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
         {terminalIds.map((id) => {
           const tab = tabs.find((t) => t.id === id);
           if (!tab) return null;
-          // Only show terminal if it belongs to current worktree AND is the active tab
-          const isTerminalActive = tab.cwd === cwd && activeId === id;
+          // Only show terminal if panel is active, belongs to current worktree AND is the active tab
+          const isTerminalActive = isActive && tab.cwd === cwd && activeId === id;
           return (
             <div
               key={id}

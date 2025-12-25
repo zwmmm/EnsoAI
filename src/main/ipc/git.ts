@@ -19,6 +19,11 @@ export function unregisterAuthorizedWorkdir(workdir: string): void {
   gitServices.delete(resolved);
 }
 
+export function clearAllGitServices(): void {
+  gitServices.clear();
+  authorizedWorkdirs.clear();
+}
+
 function validateWorkdir(workdir: string): string {
   const resolved = path.resolve(workdir);
 
@@ -108,10 +113,11 @@ export function registerGitHandlers(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.GIT_INIT, async (_, workdir: string) => {
-    const git = getGitService(workdir);
+    const resolved = validateWorkdir(workdir);
+    const git = getGitService(resolved);
     await git.init();
     // Clear the service cache after init to get fresh instance
-    gitServices.delete(workdir);
+    gitServices.delete(resolved);
   });
 
   ipcMain.handle(IPC_CHANNELS.GIT_FILE_CHANGES, async (_, workdir: string) => {

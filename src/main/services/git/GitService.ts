@@ -96,36 +96,44 @@ export class GitService {
     const status: StatusResult = await this.git.status();
     const changes: FileChange[] = [];
 
+    // Build a map of renamed files for quick lookup
+    const renamedMap = new Map<string, string>();
+    for (const rename of status.renamed) {
+      renamedMap.set(rename.to, rename.from);
+    }
+
     // Helper to determine status for staged files
-    const getStatus = (file: string, statusFiles: StatusResult): FileChangeStatus => {
-      if (statusFiles.created.includes(file)) return 'A';
-      if (statusFiles.deleted.includes(file)) return 'D';
-      if (statusFiles.renamed.some((r) => r.to === file)) return 'R';
-      if (statusFiles.conflicted.includes(file)) return 'X';
+    const getStagedStatus = (file: string): FileChangeStatus => {
+      if (status.created.includes(file)) return 'A';
+      if (renamedMap.has(file)) return 'R';
+      if (status.conflicted.includes(file)) return 'X';
+      // For staged files, check if the file exists in the files array with deleted status
+      // simple-git marks staged deletions in the 'staged' array
       return 'M';
     };
 
     // Staged files
     for (const file of status.staged) {
-      changes.push({
+      const change: FileChange = {
         path: file,
-        status: getStatus(file, status),
+        status: getStagedStatus(file),
         staged: true,
-      });
+      };
+      // Add originalPath for renamed files
+      if (renamedMap.has(file)) {
+        change.originalPath = renamedMap.get(file);
+      }
+      changes.push(change);
     }
 
-    // Unstaged modified files (exclude already staged)
+    // Unstaged modified files (include even if staged - partial staging case)
     for (const file of status.modified) {
-      if (!status.staged.includes(file)) {
-        changes.push({ path: file, status: 'M', staged: false });
-      }
+      changes.push({ path: file, status: 'M', staged: false });
     }
 
-    // Unstaged deleted files
+    // Unstaged deleted files (include even if staged - partial staging case)
     for (const file of status.deleted) {
-      if (!status.staged.includes(file)) {
-        changes.push({ path: file, status: 'D', staged: false });
-      }
+      changes.push({ path: file, status: 'D', staged: false });
     }
 
     // Untracked files
@@ -133,7 +141,7 @@ export class GitService {
       changes.push({ path: file, status: 'U', staged: false });
     }
 
-    // Conflicted files
+    // Conflicted files (add if not already present)
     for (const file of status.conflicted) {
       if (!changes.some((c) => c.path === file)) {
         changes.push({ path: file, status: 'X', staged: false });
