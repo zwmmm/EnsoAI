@@ -155,27 +155,36 @@ export function AgentTerminal({
   // Also detect Enter key press to mark session as activated
   const handleCustomKey = useCallback(
     (event: KeyboardEvent, ptyId: string) => {
+      // Only handle keydown events
+      if (event.type !== 'keydown') return true;
+
       // Detect Enter key press (without modifiers) to activate session and start idle monitoring
       if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
-        if (event.type === 'keydown') {
-          // 首次 Enter 激活 session
-          if (!hasActivatedRef.current && !activated) {
-            hasActivatedRef.current = true;
-            onActivated?.();
-          }
-          // 每次 Enter 开启空闲监听，等待下一次通知
-          isWaitingForIdleRef.current = true;
+        // 首次 Enter 激活 session
+        if (!hasActivatedRef.current && !activated) {
+          hasActivatedRef.current = true;
+          onActivated?.();
         }
+        // 每次 Enter 开启空闲监听，等待下一次通知
+        isWaitingForIdleRef.current = true;
         return true; // Let Enter through normally
       }
 
       // Handle Shift+Enter for newline
       if (event.key === 'Enter' && event.shiftKey) {
-        if (event.type === 'keydown') {
-          window.electronAPI.terminal.write(ptyId, '\x0a');
-        }
+        window.electronAPI.terminal.write(ptyId, '\x0a');
         return false;
       }
+
+      // User is typing - cancel idle notification
+      if (isWaitingForIdleRef.current && !event.metaKey && !event.ctrlKey) {
+        isWaitingForIdleRef.current = false;
+        if (idleTimerRef.current) {
+          clearTimeout(idleTimerRef.current);
+          idleTimerRef.current = null;
+        }
+      }
+
       return true;
     },
     [activated, onActivated]
