@@ -49,7 +49,10 @@ export function CreateWorktreeDialog({
   const pathSep = isWindows ? '\\' : '/';
   const getWorktreePath = (branchName: string) => {
     if (!home) return '';
-    return [home, 'ensoai', 'workspaces', projectName, branchName].join(pathSep);
+    // 从 projectName 中提取最后一个目录名，处理传入完整路径的情况
+    const normalizedName = projectName.replace(/\\/g, '/');
+    const projectBaseName = normalizedName.split('/').filter(Boolean).pop() || projectName;
+    return [home, 'ensoai', 'workspaces', projectBaseName, branchName].join(pathSep);
   };
 
   const localBranches = branches.filter((b) => !b.name.startsWith('remotes/'));
