@@ -43,6 +43,8 @@ export interface UseXtermOptions {
   onData?: (data: string) => void;
   /** Custom key event handler, return false to prevent default */
   onCustomKey?: (event: KeyboardEvent, ptyId: string) => boolean;
+  /** Called when terminal title changes (via OSC escape sequence) */
+  onTitleChange?: (title: string) => void;
 }
 
 export interface UseXtermResult {
@@ -102,6 +104,7 @@ export function useXterm({
   onExit,
   onData,
   onCustomKey,
+  onTitleChange,
 }: UseXtermOptions): UseXtermResult {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -122,6 +125,8 @@ export function useXterm({
   onDataRef.current = onData;
   const onCustomKeyRef = useRef(onCustomKey);
   onCustomKeyRef.current = onCustomKey;
+  const onTitleChangeRef = useRef(onTitleChange);
+  onTitleChangeRef.current = onTitleChange;
   const hasBeenActivatedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasReceivedDataRef = useRef(false);
@@ -223,6 +228,11 @@ export function useXterm({
 
     terminal.open(containerRef.current);
     fitAddon.fit();
+
+    // Listen for title changes (OSC escape sequences)
+    terminal.onTitleChange((title) => {
+      onTitleChangeRef.current?.(title);
+    });
 
     // Load renderer based on settings (webgl > canvas > dom)
     if (terminalRenderer === 'webgl') {

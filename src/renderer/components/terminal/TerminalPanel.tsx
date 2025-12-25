@@ -8,6 +8,8 @@ interface TerminalTab {
   id: string;
   name: string;
   cwd: string; // Track which worktree this tab belongs to
+  title?: string; // Terminal title from OSC escape sequence
+  userEdited?: boolean; // User manually edited the name, takes priority over title
 }
 
 interface TerminalPanelProps {
@@ -135,6 +137,14 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     [cwd]
   );
 
+  // Handle terminal title changes (OSC escape sequences)
+  const handleTitleChange = useCallback((id: string, title: string) => {
+    setState((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((t) => (t.id === id ? { ...t, title } : t)),
+    }));
+  }, []);
+
   const handleNextTab = useCallback(() => {
     if (!cwd) return;
     setState((prev) => {
@@ -244,7 +254,9 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     if (editingId && editingName.trim()) {
       setState((prev) => ({
         ...prev,
-        tabs: prev.tabs.map((t) => (t.id === editingId ? { ...t, name: editingName.trim() } : t)),
+        tabs: prev.tabs.map((t) =>
+          t.id === editingId ? { ...t, name: editingName.trim(), userEdited: true } : t
+        ),
       }));
     }
     setEditingId(null);
@@ -371,7 +383,9 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
                     className="flex-1 min-w-0 bg-transparent outline-none border-b border-current text-sm"
                   />
                 ) : (
-                  <span className="flex-1 truncate">{tab.name}</span>
+                  <span className="flex-1 truncate">
+                    {tab.userEdited ? tab.name : tab.title || tab.name}
+                  </span>
                 )}
                 <button
                   type="button"
@@ -429,6 +443,7 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
                 cwd={tab.cwd}
                 isActive={isTerminalActive}
                 onExit={() => handleCloseTab(id)}
+                onTitleChange={(title) => handleTitleChange(id, title)}
               />
             </div>
           );

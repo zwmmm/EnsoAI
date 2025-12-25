@@ -7,9 +7,15 @@ interface ShellTerminalProps {
   cwd?: string;
   isActive?: boolean;
   onExit?: () => void;
+  onTitleChange?: (title: string) => void;
 }
 
-export function ShellTerminal({ cwd, isActive = false, onExit }: ShellTerminalProps) {
+export function ShellTerminal({
+  cwd,
+  isActive = false,
+  onExit,
+  onTitleChange,
+}: ShellTerminalProps) {
   const {
     containerRef,
     isLoading,
@@ -23,6 +29,7 @@ export function ShellTerminal({ cwd, isActive = false, onExit }: ShellTerminalPr
     cwd,
     isActive,
     onExit,
+    onTitleChange,
   });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchBarRef = useRef<TerminalSearchBarRef>(null);

@@ -39,7 +39,8 @@ export function AgentTerminal({
   const hasInitializedRef = useRef(false);
   const hasActivatedRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasNotifiedIdleRef = useRef(false);
+  const isWaitingForIdleRef = useRef(false); // 等待空闲通知状态，Enter后开启，通知后关闭
+  const currentTitleRef = useRef<string>(''); // 当前终端标题（来自 OSC 转义序列）
 
   // Build command with session args
   const command = useMemo(() => {
@@ -112,11 +113,8 @@ export function AgentTerminal({
         outputBufferRef.current = outputBufferRef.current.slice(-500);
       }
 
-      // Skip notification if disabled
-      if (!agentNotificationEnabled) return;
-
-      // Reset idle notification state when receiving new data
-      hasNotifiedIdleRef.current = false;
+      // Skip if notification disabled or not waiting for idle
+      if (!agentNotificationEnabled || !isWaitingForIdleRef.current) return;
 
       // Clear existing idle timer
       if (idleTimerRef.current) {
@@ -125,14 +123,15 @@ export function AgentTerminal({
 
       // Set new idle timer - notify when agent stops outputting
       idleTimerRef.current = setTimeout(() => {
-        // Only notify once per idle period and only if session is activated
-        if (!hasNotifiedIdleRef.current && hasActivatedRef.current) {
-          hasNotifiedIdleRef.current = true;
-          // Extract project name from cwd path
+        if (isWaitingForIdleRef.current) {
+          // 发送通知后关闭等待状态，等待下一次 Enter
+          isWaitingForIdleRef.current = false;
+          // 使用终端标题作为通知正文，fallback 到项目名
           const projectName = cwd?.split('/').pop() || 'Unknown';
+          const notificationBody = currentTitleRef.current || projectName;
           window.electronAPI.notification.show({
             title: `${agentCommand} 已完成`,
-            body: projectName,
+            body: notificationBody,
           });
         }
       }, agentNotificationDelay * 1000);
@@ -147,15 +146,25 @@ export function AgentTerminal({
     ]
   );
 
+  // Handle terminal title changes (OSC escape sequences)
+  const handleTitleChange = useCallback((title: string) => {
+    currentTitleRef.current = title;
+  }, []);
+
   // Handle Shift+Enter for newline (Ctrl+J / LF for all agents)
   // Also detect Enter key press to mark session as activated
   const handleCustomKey = useCallback(
     (event: KeyboardEvent, ptyId: string) => {
-      // Detect Enter key press (without modifiers) to activate session
+      // Detect Enter key press (without modifiers) to activate session and start idle monitoring
       if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
-        if (event.type === 'keydown' && !hasActivatedRef.current && !activated) {
-          hasActivatedRef.current = true;
-          onActivated?.();
+        if (event.type === 'keydown') {
+          // 首次 Enter 激活 session
+          if (!hasActivatedRef.current && !activated) {
+            hasActivatedRef.current = true;
+            onActivated?.();
+          }
+          // 每次 Enter 开启空闲监听，等待下一次通知
+          isWaitingForIdleRef.current = true;
         }
         return true; // Let Enter through normally
       }
@@ -188,6 +197,7 @@ export function AgentTerminal({
     onExit: handleExit,
     onData: handleData,
     onCustomKey: handleCustomKey,
+    onTitleChange: handleTitleChange,
   });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchBarRef = useRef<TerminalSearchBarRef>(null);
