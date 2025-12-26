@@ -2,11 +2,10 @@ import { GripVertical, Plus, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
-import { BUILTIN_AGENT_IDS, useSettingsStore } from '@/stores/settings';
+import { useSettingsStore } from '@/stores/settings';
 
 const STORAGE_KEY = 'enso-session-bar';
 const EDGE_THRESHOLD = 20; // pixels from edge
-const LONG_PRESS_DELAY = 500; // ms for long press detection
 
 export interface Session {
   id: string; // UUID, also used for agent --session-id
@@ -74,7 +73,6 @@ export function SessionBar({
   const [editingName, setEditingName] = useState('');
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const [installedAgents, setInstalledAgents] = useState<Set<string>>(new Set());
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStart = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
 
   // Get enabled agents from settings
@@ -199,39 +197,15 @@ export function SessionBar({
     [handleFinishEdit]
   );
 
-  // Long press handlers for new session with agent selection
-  const clearLongPressTimer = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
+  // Hover handler for agent menu
+  const handleAddMouseEnter = useCallback(() => {
+    setShowAgentMenu(true);
   }, []);
 
-  const handleAddMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-      clearLongPressTimer();
-      longPressTimerRef.current = setTimeout(() => {
-        setShowAgentMenu(true);
-      }, LONG_PRESS_DELAY);
-    },
-    [clearLongPressTimer]
-  );
-
-  const handleAddMouseUp = useCallback(() => {
-    clearLongPressTimer();
-  }, [clearLongPressTimer]);
-
-  const handleAddMouseLeave = useCallback(() => {
-    clearLongPressTimer();
-  }, [clearLongPressTimer]);
-
   const handleAddClick = useCallback(() => {
-    // Only trigger if not showing menu (menu shown on long press)
-    if (!showAgentMenu) {
-      onNewSession();
-    }
-  }, [showAgentMenu, onNewSession]);
+    onNewSession();
+    setShowAgentMenu(false);
+  }, [onNewSession]);
 
   const handleSelectAgent = useCallback(
     (agentId: string) => {
@@ -249,11 +223,6 @@ export function SessionBar({
     },
     [customAgents, onNewSessionWithAgent]
   );
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => clearLongPressTimer();
-  }, [clearLongPressTimer]);
 
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none z-10">
@@ -346,13 +315,14 @@ export function SessionBar({
 
             <div className="mx-1 h-4 w-px bg-border" />
 
-            <div className="relative">
+            <div
+              className="relative"
+              onMouseEnter={handleAddMouseEnter}
+              onMouseLeave={() => setShowAgentMenu(false)}
+            >
               <button
                 type="button"
                 onClick={handleAddClick}
-                onMouseDown={handleAddMouseDown}
-                onMouseUp={handleAddMouseUp}
-                onMouseLeave={handleAddMouseLeave}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
               >
                 <Plus className="h-4 w-4" />
@@ -360,13 +330,8 @@ export function SessionBar({
 
               {/* Agent selection menu for new session */}
               {showAgentMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowAgentMenu(false)}
-                    onKeyDown={(e) => e.key === 'Escape' && setShowAgentMenu(false)}
-                  />
-                  <div className="absolute top-full right-0 mt-1 z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg">
+                <div className="absolute top-full right-[-10px] z-50 min-w-32 pt-1">
+                  <div className="rounded-lg border bg-popover p-1 shadow-lg">
                     <div className="px-2 py-1 text-xs text-muted-foreground">
                       {t('Select Agent')}
                     </div>
@@ -392,7 +357,7 @@ export function SessionBar({
                       );
                     })}
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
