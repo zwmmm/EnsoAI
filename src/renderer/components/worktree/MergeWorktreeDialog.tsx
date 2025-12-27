@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toastManager } from '@/components/ui/toast';
 import { useI18n } from '@/i18n';
 
 interface MergeWorktreeDialogProps {
@@ -36,7 +37,7 @@ interface MergeWorktreeDialogProps {
   branches: GitBranchType[];
   isLoading?: boolean;
   onMerge: (options: WorktreeMergeOptions) => Promise<WorktreeMergeResult>;
-  onConflicts?: (result: WorktreeMergeResult) => void;
+  onConflicts?: (result: WorktreeMergeResult, options: WorktreeMergeOptions) => void;
 }
 
 export function MergeWorktreeDialog({
@@ -90,22 +91,31 @@ export function MergeWorktreeDialog({
     setIsMerging(true);
 
     try {
-      const result = await onMerge({
+      const mergeOptions: WorktreeMergeOptions = {
         worktreePath: worktree.path,
         targetBranch,
         strategy,
         noFf: strategy === 'merge',
         deleteWorktreeAfterMerge: deleteWorktree,
         deleteBranchAfterMerge: deleteBranch,
-      });
+      };
+      const result = await onMerge(mergeOptions);
 
       if (result.success && result.merged) {
+        // Show warnings if any (combined into a single toast)
+        if (result.warnings && result.warnings.length > 0) {
+          toastManager.add({
+            type: 'warning',
+            title: t('Merge completed with warnings'),
+            description: result.warnings.join('\n'),
+          });
+        }
         onOpenChange(false);
         resetForm();
       } else if (result.conflicts && result.conflicts.length > 0) {
-        // Handle conflicts
+        // Handle conflicts - pass options for cleanup after conflict resolution
         onOpenChange(false);
-        onConflicts?.(result);
+        onConflicts?.(result, mergeOptions);
       } else if (result.error) {
         setError(result.error);
       }
@@ -237,7 +247,11 @@ export function MergeWorktreeDialog({
 
           <DialogFooter>
             <DialogClose render={<Button variant="outline">{t('Cancel')}</Button>} />
-            <Button type="submit" disabled={isLoading || isMerging || !targetBranch}>
+            <Button
+              variant="outline"
+              type="submit"
+              disabled={isLoading || isMerging || !targetBranch}
+            >
               {isMerging ? t('Merging...') : t('Merge')}
             </Button>
           </DialogFooter>

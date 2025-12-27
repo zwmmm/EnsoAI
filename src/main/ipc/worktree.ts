@@ -2,6 +2,7 @@ import {
   type ConflictResolution,
   IPC_CHANNELS,
   type WorktreeCreateOptions,
+  type WorktreeMergeCleanupOptions,
   type WorktreeMergeOptions,
   type WorktreeRemoveOptions,
 } from '@shared/types';
@@ -105,9 +106,9 @@ export function registerWorktreeHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.WORKTREE_MERGE_CONTINUE,
-    async (_, workdir: string, message?: string) => {
+    async (_, workdir: string, message?: string, cleanupOptions?: WorktreeMergeCleanupOptions) => {
       const service = getWorktreeService(workdir);
-      return service.continueMerge(workdir, message);
+      return service.continueMerge(workdir, message, cleanupOptions);
     }
   );
 }

@@ -9,6 +9,7 @@ import type {
   MergeConflictContent,
   MergeState,
   WorktreeCreateOptions,
+  WorktreeMergeCleanupOptions,
   WorktreeMergeOptions,
   WorktreeMergeResult,
   WorktreeRemoveOptions,
@@ -45,6 +46,56 @@ export class WorktreeService {
 
   constructor(workdir: string) {
     this.git = simpleGit(workdir);
+  }
+
+  /**
+   * Safely delete a branch, ignoring errors if branch doesn't exist or is in use
+   */
+  private async deleteBranchSafely(git: SimpleGit, branchName: string): Promise<string | null> {
+    try {
+      await git.raw(['branch', '-D', branchName]);
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return `Failed to delete branch '${branchName}': ${msg}`;
+    }
+  }
+
+  /**
+   * Safely delete a worktree and optionally its branch
+   */
+  private async deleteWorktreeSafely(
+    git: SimpleGit,
+    worktreePath: string,
+    options?: { deleteBranch?: boolean; branchName?: string }
+  ): Promise<string[]> {
+    const warnings: string[] = [];
+
+    try {
+      await git.raw(['worktree', 'prune']);
+      await git.raw(['worktree', 'remove', '--force', worktreePath]);
+
+      // Delete branch if requested
+      if (options?.deleteBranch && options.branchName) {
+        const branchWarning = await this.deleteBranchSafely(git, options.branchName);
+        if (branchWarning) {
+          warnings.push(branchWarning);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`Failed to delete worktree: ${msg}`);
+
+      // Still try to delete the branch if worktree deletion failed
+      if (options?.deleteBranch && options.branchName) {
+        const branchWarning = await this.deleteBranchSafely(git, options.branchName);
+        if (branchWarning) {
+          warnings.push(branchWarning);
+        }
+      }
+    }
+
+    return warnings;
   }
 
   async list(): Promise<GitWorktree[]> {
@@ -139,7 +190,7 @@ export class WorktreeService {
             } else {
               await rm(options.path, { recursive: true, force: true });
             }
-          } catch (rmError) {
+          } catch {
             // If manual deletion also fails, throw a more helpful error
             throw new Error(
               `Failed to remove worktree directory: ${options.path}. ` +
@@ -214,8 +265,15 @@ export class WorktreeService {
       };
     }
 
-    // Save current branch in main worktree
+    // Check if main worktree has uncommitted changes
     const mainStatus = await mainGit.status();
+    if (!mainStatus.isClean()) {
+      return {
+        success: false,
+        merged: false,
+        error: 'Main worktree has uncommitted changes. Please commit or stash them first.',
+      };
+    }
     const originalBranch = mainStatus.current;
 
     try {
@@ -259,7 +317,19 @@ export class WorktreeService {
               conflicts,
             };
           }
-          throw rebaseError;
+          // Rebase failed without conflicts - abort and return error
+          try {
+            await mainGit.rebase(['--abort']);
+          } catch {
+            // Ignore abort errors
+          }
+          const errorMessage =
+            rebaseError instanceof Error ? rebaseError.message : String(rebaseError);
+          return {
+            success: false,
+            merged: false,
+            error: `Rebase failed: ${errorMessage}`,
+          };
         }
       }
 
@@ -276,18 +346,18 @@ export class WorktreeService {
         const log = await mainGit.log({ maxCount: 1 });
 
         // Handle post-merge cleanup
+        // IMPORTANT: Use mainGit for worktree removal to avoid issues when
+        // the current workdir is the worktree being deleted
+        let warnings: string[] = [];
         if (options.deleteWorktreeAfterMerge) {
-          await this.remove({
-            path: options.worktreePath,
-            force: true,
+          warnings = await this.deleteWorktreeSafely(mainGit, options.worktreePath, {
             deleteBranch: options.deleteBranchAfterMerge,
-            branch: sourceBranch,
+            branchName: sourceBranch,
           });
         } else if (options.deleteBranchAfterMerge) {
-          try {
-            await mainGit.raw(['branch', '-D', sourceBranch]);
-          } catch {
-            // Branch may still be in use by worktree
+          const branchWarning = await this.deleteBranchSafely(mainGit, sourceBranch);
+          if (branchWarning) {
+            warnings.push(branchWarning);
           }
         }
 
@@ -295,6 +365,7 @@ export class WorktreeService {
           success: true,
           merged: true,
           commitHash: log.latest?.hash,
+          warnings: warnings.length > 0 ? warnings : undefined,
         };
       } catch (mergeError) {
         // Check for conflicts
@@ -436,24 +507,47 @@ export class WorktreeService {
   }
 
   /**
-   * Abort the current merge
+   * Abort the current merge/rebase
    */
   async abortMerge(workdir: string): Promise<void> {
     const git = simpleGit(workdir);
+    const { existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
 
-    try {
-      // Try normal merge abort first
-      await git.merge(['--abort']);
-    } catch {
-      // If no MERGE_HEAD (e.g., squash merge), reset to HEAD
-      await git.reset(['--hard', 'HEAD']);
+    // Determine git dir (could be .git file for worktrees)
+    const gitDir = join(workdir, '.git');
+
+    // Check for rebase in progress
+    const rebaseDir = existsSync(join(gitDir, 'rebase-merge'))
+      ? join(gitDir, 'rebase-merge')
+      : existsSync(join(gitDir, 'rebase-apply'))
+        ? join(gitDir, 'rebase-apply')
+        : null;
+
+    if (rebaseDir) {
+      await git.rebase(['--abort']);
+      return;
     }
+
+    // Check for merge in progress
+    const mergeHeadExists = existsSync(join(gitDir, 'MERGE_HEAD'));
+    if (mergeHeadExists) {
+      await git.merge(['--abort']);
+      return;
+    }
+
+    // Fallback: reset staged changes (for squash merge conflicts)
+    await git.reset(['--hard', 'HEAD']);
   }
 
   /**
    * Continue merge after resolving all conflicts
    */
-  async continueMerge(workdir: string, message?: string): Promise<WorktreeMergeResult> {
+  async continueMerge(
+    workdir: string,
+    message?: string,
+    cleanupOptions?: WorktreeMergeCleanupOptions
+  ): Promise<WorktreeMergeResult> {
     const git = simpleGit(workdir);
 
     // Check if there are still unresolved conflicts
@@ -473,10 +567,31 @@ export class WorktreeService {
       await git.commit(commitMessage);
 
       const log = await git.log({ maxCount: 1 });
+
+      // Handle post-merge cleanup if options provided
+      let warnings: string[] = [];
+      if (cleanupOptions?.deleteWorktreeAfterMerge && cleanupOptions.worktreePath) {
+        // If current workdir is the worktree being deleted, use main worktree's git instead
+        const cleanupGit =
+          workdir === cleanupOptions.worktreePath
+            ? simpleGit(await this.getMainWorktreePath())
+            : git;
+        warnings = await this.deleteWorktreeSafely(cleanupGit, cleanupOptions.worktreePath, {
+          deleteBranch: cleanupOptions.deleteBranchAfterMerge,
+          branchName: cleanupOptions.sourceBranch,
+        });
+      } else if (cleanupOptions?.deleteBranchAfterMerge && cleanupOptions.sourceBranch) {
+        const branchWarning = await this.deleteBranchSafely(git, cleanupOptions.sourceBranch);
+        if (branchWarning) {
+          warnings.push(branchWarning);
+        }
+      }
+
       return {
         success: true,
         merged: true,
         commitHash: log.latest?.hash,
+        warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

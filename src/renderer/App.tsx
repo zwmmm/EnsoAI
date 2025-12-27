@@ -1,6 +1,7 @@
 import type {
   GitWorktree,
   WorktreeCreateOptions,
+  WorktreeMergeCleanupOptions,
   WorktreeMergeOptions,
   WorktreeMergeResult,
 } from '@shared/types';
@@ -25,6 +26,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from './components/ui/dialog';
+import { toastManager } from './components/ui/toast';
 import { MergeEditor, MergeWorktreeDialog } from './components/worktree';
 import { useEditor } from './hooks/useEditor';
 import { useGitBranches, useGitInit } from './hooks/useGit';
@@ -72,6 +74,11 @@ export default function App() {
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeWorktree, setMergeWorktree] = useState<GitWorktree | null>(null);
   const [mergeConflicts, setMergeConflicts] = useState<WorktreeMergeResult | null>(null);
+  const [pendingMergeOptions, setPendingMergeOptions] = useState<
+    | (Required<Pick<WorktreeMergeCleanupOptions, 'worktreePath' | 'sourceBranch'>> &
+        Pick<WorktreeMergeCleanupOptions, 'deleteWorktreeAfterMerge' | 'deleteBranchAfterMerge'>)
+    | null
+  >(null);
 
   // Panel resize hook
   const { repositoryWidth, worktreeWidth, resizing, handleResizeStart } = usePanelResize();
@@ -416,8 +423,16 @@ export default function App() {
     return mergeMutation.mutateAsync({ workdir: selectedRepo, options });
   };
 
-  const handleMergeConflicts = (result: WorktreeMergeResult) => {
+  const handleMergeConflicts = (result: WorktreeMergeResult, options: WorktreeMergeOptions) => {
+    setMergeDialogOpen(false); // Close merge dialog first
     setMergeConflicts(result);
+    // Store the merge options for cleanup after conflict resolution
+    setPendingMergeOptions({
+      worktreePath: options.worktreePath,
+      sourceBranch: mergeWorktree?.branch || '',
+      deleteWorktreeAfterMerge: options.deleteWorktreeAfterMerge,
+      deleteBranchAfterMerge: options.deleteBranchAfterMerge,
+    });
   };
 
   const handleResolveConflict = async (file: string, content: string) => {
@@ -432,14 +447,28 @@ export default function App() {
     if (!selectedRepo) return;
     await abortMergeMutation.mutateAsync({ workdir: selectedRepo });
     setMergeConflicts(null);
+    setPendingMergeOptions(null);
     refetch();
   };
 
   const handleCompleteMerge = async (message: string) => {
     if (!selectedRepo) return;
-    const result = await continueMergeMutation.mutateAsync({ workdir: selectedRepo, message });
+    const result = await continueMergeMutation.mutateAsync({
+      workdir: selectedRepo,
+      message,
+      cleanupOptions: pendingMergeOptions || undefined,
+    });
     if (result.success) {
+      // Show warnings if any (combined into a single toast)
+      if (result.warnings && result.warnings.length > 0) {
+        toastManager.add({
+          type: 'warning',
+          title: t('Merge completed with warnings'),
+          description: result.warnings.join('\n'),
+        });
+      }
       setMergeConflicts(null);
+      setPendingMergeOptions(null);
       refetch();
       refetchBranches();
     }
@@ -616,7 +645,7 @@ export default function App() {
       {/* Merge Conflict Editor */}
       {mergeConflicts?.conflicts && mergeConflicts.conflicts.length > 0 && (
         <Dialog open={true} onOpenChange={() => {}}>
-          <DialogPopup className="h-[90vh] max-w-[95vw] p-0">
+          <DialogPopup className="h-[90vh] max-w-[95vw] p-0" showCloseButton={false}>
             <MergeEditor
               conflicts={mergeConflicts.conflicts}
               workdir={selectedRepo || ''}

@@ -72,20 +72,22 @@ export function SourceControlPanel({
     refetch,
   } = useFileChanges(rootPath ?? null, isActive);
 
-  // Refetch immediately when tab becomes active
-  useEffect(() => {
-    if (isActive && rootPath) {
-      refetch();
-    }
-  }, [isActive, rootPath, refetch]);
-
   const {
     data: commitsData,
     isLoading: commitsLoading,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
+    refetch: refetchCommits,
   } = useGitHistoryInfinite(rootPath ?? null, 20);
+
+  // Refetch immediately when tab becomes active
+  useEffect(() => {
+    if (isActive && rootPath) {
+      refetch();
+      refetchCommits();
+    }
+  }, [isActive, rootPath, refetch, refetchCommits]);
 
   // Flatten infinite query data
   const commits = commitsData?.pages.flat() ?? [];
@@ -303,7 +305,10 @@ export function SourceControlPanel({
                         onUnstage={handleUnstage}
                         onDiscard={handleDiscard}
                         onDeleteUntracked={handleDeleteUntracked}
-                        onRefresh={() => refetch()}
+                        onRefresh={() => {
+                          refetch();
+                          refetchCommits();
+                        }}
                         isRefreshing={isFetching}
                         repoPath={rootPath}
                       />

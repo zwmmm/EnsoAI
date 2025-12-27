@@ -52,6 +52,7 @@ export interface WorktreeMergeResult {
   conflicts?: MergeConflict[];
   commitHash?: string;
   error?: string;
+  warnings?: string[];
 }
 
 export interface ConflictResolution {
@@ -64,4 +65,11 @@ export interface MergeState {
   targetBranch?: string;
   sourceBranch?: string;
   conflicts?: MergeConflict[];
+}
+
+export interface WorktreeMergeCleanupOptions {
+  worktreePath?: string;
+  sourceBranch?: string;
+  deleteWorktreeAfterMerge?: boolean;
+  deleteBranchAfterMerge?: boolean;
 }

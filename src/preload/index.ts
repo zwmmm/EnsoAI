@@ -23,6 +23,7 @@ import type {
   TerminalCreateOptions,
   TerminalResizeOptions,
   WorktreeCreateOptions,
+  WorktreeMergeCleanupOptions,
   WorktreeMergeOptions,
   WorktreeMergeResult,
   WorktreeRemoveOptions,
@@ -132,8 +133,12 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_MERGE_RESOLVE, workdir, resolution),
     abortMerge: (workdir: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_MERGE_ABORT, workdir),
-    continueMerge: (workdir: string, message?: string): Promise<WorktreeMergeResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_MERGE_CONTINUE, workdir, message),
+    continueMerge: (
+      workdir: string,
+      message?: string,
+      cleanupOptions?: WorktreeMergeCleanupOptions
+    ): Promise<WorktreeMergeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_MERGE_CONTINUE, workdir, message, cleanupOptions),
   },
 
   // Files

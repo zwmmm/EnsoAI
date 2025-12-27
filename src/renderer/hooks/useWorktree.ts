@@ -1,6 +1,7 @@
 import type {
   ConflictResolution,
   WorktreeCreateOptions,
+  WorktreeMergeCleanupOptions,
   WorktreeMergeOptions,
   WorktreeRemoveOptions,
 } from '@shared/types';
@@ -87,6 +88,7 @@ export function useWorktreeMerge() {
     onSuccess: (_, { workdir }) => {
       queryClient.invalidateQueries({ queryKey: ['worktree', 'list', workdir] });
       queryClient.invalidateQueries({ queryKey: ['worktree', 'mergeState', workdir] });
+      queryClient.invalidateQueries({ queryKey: ['git', 'branches', workdir] });
     },
   });
 }
@@ -162,13 +164,22 @@ export function useWorktreeMergeContinue() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ workdir, message }: { workdir: string; message?: string }) => {
-      return window.electronAPI.worktree.continueMerge(workdir, message);
+    mutationFn: async ({
+      workdir,
+      message,
+      cleanupOptions,
+    }: {
+      workdir: string;
+      message?: string;
+      cleanupOptions?: WorktreeMergeCleanupOptions;
+    }) => {
+      return window.electronAPI.worktree.continueMerge(workdir, message, cleanupOptions);
     },
     onSuccess: (_, { workdir }) => {
       queryClient.invalidateQueries({ queryKey: ['worktree', 'list', workdir] });
       queryClient.invalidateQueries({ queryKey: ['worktree', 'mergeState', workdir] });
       queryClient.invalidateQueries({ queryKey: ['worktree', 'conflicts', workdir] });
+      queryClient.invalidateQueries({ queryKey: ['git', 'branches', workdir] });
     },
   });
 }

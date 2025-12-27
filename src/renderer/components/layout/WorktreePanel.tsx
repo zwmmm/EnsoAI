@@ -515,7 +515,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
             {activity.agentCount > 0 && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
                 onClick={() => {
                   setMenuOpen(false);
                   closeAgentSessions(worktree.path);
@@ -531,7 +531,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
             {activity.terminalCount > 0 && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
                 onClick={() => {
                   setMenuOpen(false);
                   closeTerminalSessions(worktree.path);
@@ -550,7 +550,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
             {onMerge && !isMain && !isPrunable && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
                 onClick={() => {
                   setMenuOpen(false);
                   onMerge();
@@ -568,7 +568,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
             <button
               type="button"
               className={cn(
-                'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent',
+                'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent/50',
                 isMain && 'pointer-events-none opacity-50'
               )}
               onClick={() => {
