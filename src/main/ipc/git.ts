@@ -314,10 +314,22 @@ ${truncatedDiff}`;
     async (
       event,
       workdir: string,
-      options: { model: string; language?: string; reviewId: string }
-    ): Promise<{ success: boolean; error?: string }> => {
+      options: {
+        model: string;
+        language?: string;
+        continueConversation?: boolean;
+        sessionId?: string;
+        reviewId: string;
+      }
+    ): Promise<{ success: boolean; error?: string; sessionId?: string }> => {
       const resolved = validateWorkdir(workdir);
-      const { model, language = '中文', reviewId } = options;
+      const {
+        model,
+        language = '中文',
+        continueConversation = false,
+        sessionId,
+        reviewId,
+      } = options;
 
       // Helper to run git commands
       const runGit = (cmd: string): string => {
@@ -380,7 +392,9 @@ ${gitLog || '(No commit history available)'}`;
         '-p',
         '--output-format',
         'stream-json',
-        '--no-session-persistence',
+        ...(continueConversation && sessionId
+          ? ['--session-id', sessionId]
+          : ['--no-session-persistence']),
         '--disallowedTools',
         '"Bash(git:*)" Edit',
         '--model',
@@ -454,7 +468,7 @@ ${gitLog || '(No commit history available)'}`;
         }
       });
 
-      return { success: true };
+      return { success: true, sessionId: continueConversation ? sessionId : undefined };
     }
   );
 

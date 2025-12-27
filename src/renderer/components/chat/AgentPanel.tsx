@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { matchesKeybinding } from '@/lib/keybinding';
 import { useAgentSessionsStore } from '@/stores/agentSessions';
+import { useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 import { BUILTIN_AGENT_IDS, useSettingsStore } from '@/stores/settings';
 import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
 import { AgentTerminal } from './AgentTerminal';
@@ -257,6 +258,28 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
     });
     return unsubscribe;
   }, [handleSelectSession, allSessions, cwd, onSwitchWorktree]);
+
+  // 监听 code review 继续对话请求
+  const pendingSessionId = useCodeReviewContinueStore((s) => s.pendingSessionId);
+  const clearContinueRequest = useCodeReviewContinueStore((s) => s.clearRequest);
+
+  useEffect(() => {
+    if (pendingSessionId && cwd) {
+      // 创建新 session 继续 code review 对话
+      const newSession: Session = {
+        id: pendingSessionId, // 使用 code review 的 sessionId
+        name: 'Code Review',
+        agentId: 'claude',
+        agentCommand: 'claude',
+        initialized: true, // 已初始化，使用 --resume
+        repoPath,
+        cwd,
+        environment: 'native',
+      };
+      addSession(newSession);
+      clearContinueRequest();
+    }
+  }, [pendingSessionId, cwd, repoPath, addSession, clearContinueRequest]);
 
   const handleNextSession = useCallback(() => {
     const sessions = allSessions.filter((s) => s.repoPath === repoPath && s.cwd === cwd);

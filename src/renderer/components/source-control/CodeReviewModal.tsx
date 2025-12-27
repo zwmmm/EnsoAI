@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle, Copy, Loader2, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Copy, Loader2, MessageSquare, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import type { Components } from 'react-markdown';
 import Markdown from 'react-markdown';
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toastManager } from '@/components/ui/toast';
 import { useCodeReview } from '@/hooks/useCodeReview';
 import { useI18n } from '@/i18n';
+import { useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 
 // 自定义 Markdown 组件
 const markdownComponents: Components = {
@@ -121,9 +122,21 @@ interface CodeReviewModalProps {
 
 export function CodeReviewModal({ open, onOpenChange, repoPath }: CodeReviewModalProps) {
   const { t } = useI18n();
-  const { content, status, error, cost, model, startReview, stopReview, reset } = useCodeReview({
+  const {
+    content,
+    status,
+    error,
+    cost,
+    model,
+    sessionId,
+    canContinue,
+    startReview,
+    stopReview,
+    reset,
+  } = useCodeReview({
     repoPath,
   });
+  const requestContinue = useCodeReviewContinueStore((s) => s.requestContinue);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
@@ -192,6 +205,14 @@ export function CodeReviewModal({ open, onOpenChange, repoPath }: CodeReviewModa
     }
     onOpenChange(false);
   }, [status, stopReview, onOpenChange]);
+
+  // 处理继续对话
+  const handleContinue = useCallback(() => {
+    if (sessionId) {
+      requestContinue(sessionId);
+      onOpenChange(false);
+    }
+  }, [sessionId, requestContinue, onOpenChange]);
 
   // 状态图标
   const StatusIcon = () => {
@@ -284,7 +305,19 @@ export function CodeReviewModal({ open, onOpenChange, repoPath }: CodeReviewModa
               {t('Copy')}
             </Button>
           )}
-          <DialogClose render={<Button onClick={handleClose}>{t('Close')}</Button>} />
+          {status === 'complete' && canContinue && (
+            <Button variant="outline" onClick={handleContinue}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              {t('Continue Conversation')}
+            </Button>
+          )}
+          <DialogClose
+            render={
+              <Button variant="outline" onClick={handleClose}>
+                {t('Close')}
+              </Button>
+            }
+          />
         </DialogFooter>
       </DialogPopup>
     </Dialog>

@@ -12,6 +12,8 @@ interface UseCodeReviewReturn {
   error: string | null;
   cost: number | null;
   model: string | null;
+  sessionId: string | null;
+  canContinue: boolean;
   startReview: () => Promise<void>;
   stopReview: () => void;
   reset: () => void;
@@ -24,6 +26,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
   const [error, setError] = useState<string | null>(null);
   const [cost, setCost] = useState<number | null>(null);
   const [model, setModel] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const parserRef = useRef<StreamJsonParser>(new StreamJsonParser());
   const reviewIdRef = useRef<string | null>(null);
@@ -101,6 +104,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     setError(null);
     setCost(null);
     setModel(null);
+    setSessionId(null);
     setStatus('initializing');
     parserRef.current.reset();
     cleanup();
@@ -109,6 +113,10 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
       // 生成唯一的 reviewId
       const reviewId = `review-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       reviewIdRef.current = reviewId;
+
+      // 生成 claude session ID（仅当 continueConversation 开启时）
+      const shouldContinue = codeReviewSettings.continueConversation ?? true;
+      const claudeSessionId = shouldContinue ? crypto.randomUUID() : undefined;
 
       // 监听数据输出
       const onDataCleanup = window.electronAPI.git.onCodeReviewData((event) => {
@@ -137,7 +145,9 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
       // 启动代码审查
       const result = await window.electronAPI.git.startCodeReview(repoPath, {
         model: codeReviewSettings.model,
-        language: codeReviewSettings.language,
+        language: codeReviewSettings.language ?? '中文',
+        continueConversation: shouldContinue,
+        sessionId: claudeSessionId,
         reviewId,
       });
 
@@ -145,6 +155,8 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
         setStatus('error');
         setError(result.error || 'Failed to start review');
         cleanup();
+      } else if (result.sessionId) {
+        setSessionId(result.sessionId);
       }
     } catch (err) {
       setStatus('error');
@@ -158,6 +170,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     status,
     codeReviewSettings.model,
     codeReviewSettings.language,
+    codeReviewSettings.continueConversation,
   ]);
 
   // 停止审查
@@ -173,9 +186,13 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     setError(null);
     setCost(null);
     setModel(null);
+    setSessionId(null);
     setStatus('idle');
     parserRef.current.reset();
   }, [cleanup]);
+
+  // 处理旧用户没有新字段的情况
+  const continueConversation = codeReviewSettings.continueConversation ?? true;
 
   return {
     content,
@@ -183,6 +200,8 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     error,
     cost,
     model,
+    sessionId,
+    canContinue: continueConversation && sessionId !== null,
     startReview,
     stopReview,
     reset,

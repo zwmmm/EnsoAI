@@ -269,7 +269,7 @@ export function IntegrationSettings() {
               <span className="text-sm font-medium">{t('Language')}</span>
               <div className="space-y-1.5">
                 <Input
-                  value={codeReview.language}
+                  value={codeReview.language ?? '中文'}
                   onChange={(e) => setCodeReview({ language: e.target.value })}
                   placeholder="中文"
                   className="w-32"
@@ -278,6 +278,20 @@ export function IntegrationSettings() {
                   {t('Language for code review output')}
                 </p>
               </div>
+            </div>
+
+            {/* Continue Conversation */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium">{t('Continue Conversation')}</span>
+                <p className="text-xs text-muted-foreground">
+                  {t('Preserve session for follow-up conversations after review')}
+                </p>
+              </div>
+              <Switch
+                checked={codeReview.continueConversation ?? true}
+                onCheckedChange={(checked) => setCodeReview({ continueConversation: checked })}
+              />
             </div>
           </div>
         )}
