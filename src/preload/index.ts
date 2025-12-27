@@ -74,6 +74,33 @@ const electronAPI = {
       options: { maxDiffLines: number; timeout: number; model: string }
     ): Promise<{ success: boolean; message?: string; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_GENERATE_COMMIT_MSG, workdir, options),
+    startCodeReview: (
+      workdir: string,
+      options: { model: string; reviewId: string }
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_CODE_REVIEW_START, workdir, options),
+    stopCodeReview: (reviewId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_CODE_REVIEW_STOP, reviewId),
+    onCodeReviewData: (
+      callback: (event: {
+        reviewId: string;
+        type: 'data' | 'error' | 'exit';
+        data?: string;
+        exitCode?: number;
+      }) => void
+    ): (() => void) => {
+      const handler = (
+        _: unknown,
+        event: {
+          reviewId: string;
+          type: 'data' | 'error' | 'exit';
+          data?: string;
+          exitCode?: number;
+        }
+      ) => callback(event);
+      ipcRenderer.on(IPC_CHANNELS.GIT_CODE_REVIEW_DATA, handler);
+      return () => ipcRenderer.off(IPC_CHANNELS.GIT_CODE_REVIEW_DATA, handler);
+    },
   },
 
   // Worktree

@@ -2,41 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ReviewStatus, type StreamEvent, StreamJsonParser } from '@/lib/stream-json-parser';
 import { useSettingsStore } from '@/stores/settings';
 
-const CODE_REVIEW_PROMPT = `Always reply in Chinese.
-You are performing a code review on the changes in the current branch.
-
-
-## Code Review Instructions
-
-The entire git diff for this branch has been provided below, as well as a list of all commits made to this branch.
-
-**CRITICAL: EVERYTHING YOU NEED IS ALREADY PROVIDED BELOW.** The complete git diff and full commit history are included in this message.
-
-**DO NOT run git diff, git log, git status, or ANY other git commands.** All the information you need to perform this review is already here.
-
-When reviewing the diff:
-1. **Focus on logic and correctness** - Check for bugs, edge cases, and potential issues.
-2. **Consider readability** - Is the code clear and maintainable? Does it follow best practices in this repository?
-3. **Evaluate performance** - Are there obvious performance concerns or optimizations that could be made?
-4. **Assess test coverage** - Does the repository have testing patterns? If so, are there adequate tests for these changes?
-5. **Ask clarifying questions** - Ask the user for clarification if you are unsure about the changes or need more context.
-6. **Don't be overly pedantic** - Nitpicks are fine, but only if they are relevant issues within reason.
-
-In your output:
-- Provide a summary overview of the general code quality.
-- Present the identified issues in a table with the columns: index (1, 2, etc.), line number(s), code, issue, and potential solution(s).
-- If no issues are found, briefly state that the code meets best practices.
-
-## Full Diff
-
-**REMINDER: DO NOT use any tools to fetch git information.** Simply read the diff and commit history that follow.
-
-$(git diff HEAD)
-
-## Commit History
-
-$(git log origin/main..HEAD)`;
-
 interface UseCodeReviewOptions {
   repoPath: string | undefined;
 }
@@ -61,19 +26,19 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
   const [model, setModel] = useState<string | null>(null);
 
   const parserRef = useRef<StreamJsonParser>(new StreamJsonParser());
-  const ptyIdRef = useRef<string | null>(null);
-  const cleanupFnsRef = useRef<Array<() => void>>([]);
+  const reviewIdRef = useRef<string | null>(null);
+  const cleanupFnRef = useRef<(() => void) | null>(null);
 
   // 清理函数
   const cleanup = useCallback(() => {
-    for (const fn of cleanupFnsRef.current) {
-      fn();
+    if (cleanupFnRef.current) {
+      cleanupFnRef.current();
+      cleanupFnRef.current = null;
     }
-    cleanupFnsRef.current = [];
 
-    if (ptyIdRef.current) {
-      window.electronAPI.terminal.destroy(ptyIdRef.current).catch(console.error);
-      ptyIdRef.current = null;
+    if (reviewIdRef.current) {
+      window.electronAPI.git.stopCodeReview(reviewIdRef.current).catch(console.error);
+      reviewIdRef.current = null;
     }
   }, []);
 
@@ -141,60 +106,49 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     cleanup();
 
     try {
-      // 构建命令
-      // 使用 shell -c 来执行完整命令，确保 $() 会被展开
-      const isWindows = window.electronAPI?.env?.platform === 'win32';
-
-      // 转义 prompt 中的引号
-      const escapedPrompt = CODE_REVIEW_PROMPT.replace(/"/g, '\\"');
-
-      const claudeCommand = `claude "${escapedPrompt}" -p --output-format stream-json --no-session-persistence --disallowedTools "Bash(git:*) Edit" --model ${codeReviewSettings.model} --verbose --include-partial-messages`;
-
-      // Use login shell to load user environment (nvm, homebrew, etc.)
-      // Same approach as AgentTerminal for consistent shell configuration
-      // Try zsh first (macOS default), fallback to bash (Linux default), then sh
-      const shells = ['/bin/zsh', '/bin/bash', '/bin/sh'];
-      const shell = isWindows ? 'cmd.exe' : shells[0];
-      // Note: dash (/bin/sh on some Linux) doesn't support -l, but zsh/bash do
-      // PtyManager will handle fallback if zsh doesn't exist
-      const args = isWindows ? ['/c', claudeCommand] : ['-i', '-l', '-c', claudeCommand];
-
-      const ptyId = await window.electronAPI.terminal.create({
-        cwd: repoPath,
-        shell,
-        args,
-      });
-
-      ptyIdRef.current = ptyId;
+      // 生成唯一的 reviewId
+      const reviewId = `review-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      reviewIdRef.current = reviewId;
 
       // 监听数据输出
-      const onDataCleanup = window.electronAPI.terminal.onData(({ id, data }) => {
-        if (id !== ptyId) return;
+      const onDataCleanup = window.electronAPI.git.onCodeReviewData((event) => {
+        if (event.reviewId !== reviewId) return;
 
-        const events = parserRef.current.parse(data);
-        for (const event of events) {
-          handleEvent(event);
+        if (event.type === 'data' && event.data) {
+          const events = parserRef.current.parse(event.data);
+          for (const e of events) {
+            handleEvent(e);
+          }
+        } else if (event.type === 'error' && event.data) {
+          // stderr 输出通常是日志，不一定是错误
+          console.warn('[CodeReview stderr]', event.data);
+        } else if (event.type === 'exit') {
+          if (event.exitCode !== 0 && status !== 'complete') {
+            setStatus('error');
+            setError(`Process exited with code ${event.exitCode}`);
+          } else if (status !== 'error') {
+            setStatus('complete');
+          }
+          reviewIdRef.current = null;
         }
       });
-      cleanupFnsRef.current.push(onDataCleanup);
+      cleanupFnRef.current = onDataCleanup;
 
-      // 监听退出事件
-      const onExitCleanup = window.electronAPI.terminal.onExit(({ id, exitCode }) => {
-        if (id !== ptyId) return;
-
-        if (exitCode !== 0 && status !== 'complete') {
-          setStatus('error');
-          setError(`Process exited with code ${exitCode}`);
-        } else if (status !== 'error') {
-          setStatus('complete');
-        }
-
-        ptyIdRef.current = null;
+      // 启动代码审查
+      const result = await window.electronAPI.git.startCodeReview(repoPath, {
+        model: codeReviewSettings.model,
+        reviewId,
       });
-      cleanupFnsRef.current.push(onExitCleanup);
+
+      if (!result.success) {
+        setStatus('error');
+        setError(result.error || 'Failed to start review');
+        cleanup();
+      }
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to start review');
+      cleanup();
     }
   }, [repoPath, cleanup, handleEvent, status, codeReviewSettings.model]);
 
