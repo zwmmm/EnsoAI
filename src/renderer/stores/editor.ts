@@ -14,11 +14,21 @@ export interface PendingCursor {
   column?: number;
 }
 
+interface WorktreeEditorState {
+  tabs: EditorTab[];
+  activeTabPath: string | null;
+}
+
 interface EditorState {
+  // Current active state
   tabs: EditorTab[];
   activeTabPath: string | null;
   pendingCursor: PendingCursor | null;
   currentCursorLine: number | null; // Current cursor line in active editor
+
+  // Per-worktree state storage
+  worktreeStates: Record<string, WorktreeEditorState>;
+  currentWorktreePath: string | null;
 
   openFile: (file: Omit<EditorTab, 'title' | 'viewState'> & { title?: string }) => void;
   closeFile: (path: string) => void;
@@ -29,15 +39,20 @@ interface EditorState {
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   setPendingCursor: (cursor: PendingCursor | null) => void;
   setCurrentCursorLine: (line: number | null) => void;
+  switchWorktree: (worktreePath: string | null) => void;
+  clearAllWorktreeStates: () => void;
+  clearWorktreeState: (worktreePath: string) => void;
 }
 
 const getTabTitle = (path: string) => path.split(/[/\\]/).pop() || path;
 
-export const useEditorStore = create<EditorState>((set) => ({
+export const useEditorStore = create<EditorState>((set, get) => ({
   tabs: [],
   activeTabPath: null,
   pendingCursor: null,
   currentCursorLine: null,
+  worktreeStates: {},
+  currentWorktreePath: null,
 
   openFile: (file) =>
     set((state) => {
@@ -104,4 +119,51 @@ export const useEditorStore = create<EditorState>((set) => ({
   setPendingCursor: (cursor) => set({ pendingCursor: cursor }),
 
   setCurrentCursorLine: (line) => set({ currentCursorLine: line }),
+
+  switchWorktree: (worktreePath) => {
+    const state = get();
+    const currentPath = state.currentWorktreePath;
+
+    // Save current worktree state (if we have one)
+    let newWorktreeStates = state.worktreeStates;
+    if (currentPath) {
+      newWorktreeStates = {
+        ...newWorktreeStates,
+        [currentPath]: {
+          tabs: state.tabs,
+          activeTabPath: state.activeTabPath,
+        },
+      };
+    }
+
+    // Load new worktree state (or empty if none)
+    const savedState = worktreePath ? newWorktreeStates[worktreePath] : null;
+
+    set({
+      worktreeStates: newWorktreeStates,
+      currentWorktreePath: worktreePath,
+      tabs: savedState?.tabs ?? [],
+      activeTabPath: savedState?.activeTabPath ?? null,
+      pendingCursor: null,
+      currentCursorLine: null,
+    });
+  },
+
+  clearAllWorktreeStates: () => {
+    set({
+      worktreeStates: {},
+      currentWorktreePath: null,
+      tabs: [],
+      activeTabPath: null,
+      pendingCursor: null,
+      currentCursorLine: null,
+    });
+  },
+
+  clearWorktreeState: (worktreePath) => {
+    set((state) => {
+      const { [worktreePath]: _, ...rest } = state.worktreeStates;
+      return { worktreeStates: rest };
+    });
+  },
 }));

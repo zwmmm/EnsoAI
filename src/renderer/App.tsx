@@ -40,6 +40,7 @@ import {
   useWorktreeResolveConflict,
 } from './hooks/useWorktree';
 import { useI18n } from './i18n';
+import { useEditorStore } from './stores/editor';
 import { useNavigationStore } from './stores/navigation';
 import { useSettingsStore } from './stores/settings';
 import { useWorktreeStore } from './stores/worktree';
@@ -84,6 +85,9 @@ export default function App() {
   const { repositoryWidth, worktreeWidth, resizing, handleResizeStart } = usePanelResize();
 
   const worktreeError = useWorktreeStore((s) => s.error);
+  const switchEditorWorktree = useEditorStore((s) => s.switchWorktree);
+  const clearAllEditorStates = useEditorStore((s) => s.clearAllWorktreeStates);
+  const clearEditorWorktreeState = useEditorStore((s) => s.clearWorktreeState);
 
   // Initialize settings store (for theme hydration)
   useSettingsStore();
@@ -303,6 +307,7 @@ export default function App() {
   const handleSelectRepo = (repoPath: string) => {
     setSelectedRepo(repoPath);
     setActiveWorktree(null);
+    clearAllEditorStates(); // Clear all editor states when switching repo
   };
 
   const handleSelectWorktree = useCallback(
@@ -315,6 +320,9 @@ export default function App() {
         }));
       }
 
+      // Switch editor state to new worktree (saves current tabs, loads saved tabs)
+      switchEditorWorktree(worktree.path);
+
       // Switch to new worktree
       setActiveWorktree(worktree);
 
@@ -322,7 +330,7 @@ export default function App() {
       const savedTab = worktreeTabMap[worktree.path] || 'chat';
       setActiveTab(savedTab);
     },
-    [activeWorktree, activeTab, worktreeTabMap]
+    [activeWorktree, activeTab, worktreeTabMap, switchEditorWorktree]
   );
 
   // Handle switching worktree by path (used by notification click)
@@ -391,6 +399,8 @@ export default function App() {
         branch: worktree.branch || undefined,
       },
     });
+    // Clear editor state for the removed worktree
+    clearEditorWorktreeState(worktree.path);
     // Clear selection if the active worktree was removed.
     if (activeWorktree?.path === worktree.path) {
       setActiveWorktree(null);
