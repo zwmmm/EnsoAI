@@ -28,14 +28,24 @@ export function registerIpcHandlers(): void {
 }
 
 export async function cleanupAllResources(): Promise<void> {
-  // Stop all running processes first
+  // Stop all running processes first (sync, fast)
   destroyAllTerminals();
   stopAllAgentSessions();
 
-  // Stop file watchers
-  await stopAllFileWatchers();
+  // Stop file watchers with timeout to prevent hanging
+  const CLEANUP_TIMEOUT = 3000;
+  try {
+    await Promise.race([
+      stopAllFileWatchers(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('File watcher cleanup timeout')), CLEANUP_TIMEOUT)
+      ),
+    ]);
+  } catch (err) {
+    console.warn('Cleanup warning:', err);
+  }
 
-  // Clear service caches
+  // Clear service caches (sync, fast)
   clearAllGitServices();
   clearAllWorktreeServices();
 

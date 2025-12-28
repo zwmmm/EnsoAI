@@ -86,6 +86,8 @@ export function createMainWindow(): BrowserWindow {
   ipcMain.on(IPC_CHANNELS.APP_CLOSE_CONFIRM, (event, confirmed: boolean) => {
     if (event.sender === win.webContents && confirmed) {
       forceClose = true;
+      // Hide window first to avoid black screen during cleanup
+      win.hide();
       win.close();
     }
   });
