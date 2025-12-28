@@ -111,7 +111,23 @@ Quick access to all actions via `Cmd+Shift+P`:
 
 ### Installation
 
-#### Download
+#### Package Managers (Recommended)
+
+**macOS (Homebrew)**
+
+```bash
+brew tap j3n5en/ensoai
+brew install --cask ensoai
+```
+
+**Windows (Scoop)**
+
+```powershell
+scoop bucket add ensoai https://github.com/J3n5en/scoop-ensoai
+scoop install ensoai
+```
+
+#### Manual Download
 
 Download the installer for your platform from [GitHub Releases](https://github.com/J3n5en/EnsoAI/releases/latest):
 

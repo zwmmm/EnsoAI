@@ -109,7 +109,23 @@ EnsoAI 是一款将 **Git Worktree 管理**与 **AI 编程助手**相结合的�
 
 ### 安装
 
-#### 下载
+#### 包管理器（推荐）
+
+**macOS (Homebrew)**
+
+```bash
+brew tap j3n5en/ensoai
+brew install --cask ensoai
+```
+
+**Windows (Scoop)**
+
+```powershell
+scoop bucket add ensoai https://github.com/J3n5en/scoop-ensoai
+scoop install ensoai
+```
+
+#### 手动下载
 
 从 [GitHub Releases](https://github.com/J3n5en/EnsoAI/releases/latest) 下载适合你平台的安装包：
 
