@@ -11,7 +11,7 @@ interface AgentTerminalProps {
   cwd?: string;
   sessionId?: string;
   agentCommand?: string;
-  environment?: 'native' | 'wsl';
+  environment?: 'native' | 'wsl' | 'hapi';
   initialized?: boolean;
   activated?: boolean;
   isActive?: boolean;
@@ -36,8 +36,24 @@ export function AgentTerminal({
   onExit,
 }: AgentTerminalProps) {
   const { t } = useI18n();
-  const { agentNotificationEnabled, agentNotificationDelay, agentNotificationEnterDelay } =
-    useSettingsStore();
+  const {
+    agentNotificationEnabled,
+    agentNotificationDelay,
+    agentNotificationEnterDelay,
+    hapiSettings,
+  } = useSettingsStore();
+
+  // Track if hapi is globally installed (cached in main process)
+  const [hapiGlobalInstalled, setHapiGlobalInstalled] = useState<boolean | null>(null);
+
+  // Check hapi global installation on mount (only for hapi environment)
+  useEffect(() => {
+    if (environment === 'hapi') {
+      window.electronAPI.hapi.checkGlobal().then((status) => {
+        setHapiGlobalInstalled(status.installed);
+      });
+    }
+  }, [environment]);
   const outputBufferRef = useRef('');
   const startTimeRef = useRef<number | null>(null);
   const hasInitializedRef = useRef(false);
@@ -50,7 +66,7 @@ export function AgentTerminal({
   const currentTitleRef = useRef<string>(''); // Terminal title from OSC escape sequence.
 
   // Build command with session args
-  const command = useMemo(() => {
+  const { command, env } = useMemo(() => {
     const supportsSession = agentCommand === 'claude';
     const supportIde = agentCommand === 'claude';
     const agentArgs =
@@ -62,25 +78,70 @@ export function AgentTerminal({
     if (supportIde) {
       agentArgs.push('--ide');
     }
-    const fullCommand = `${agentCommand} ${agentArgs.join(' ')}`.trim();
 
     const isWindows = window.electronAPI?.env?.platform === 'win32';
+    let envVars: Record<string, string> | undefined;
+
+    // Hapi environment: run through hapi (global) or npx @twsxtd/hapi with CLI_API_TOKEN
+    if (environment === 'hapi') {
+      // Wait for hapi global check to complete - return undefined to delay terminal init
+      if (hapiGlobalInstalled === null) {
+        return { command: undefined, env: undefined };
+      }
+
+      // Use global 'hapi' command if installed, otherwise use npx
+      const hapiPrefix = hapiGlobalInstalled ? 'hapi' : 'npx -y @twsxtd/hapi';
+      const hapiCommand = `${hapiPrefix} ${agentCommand} ${agentArgs.join(' ')}`.trim();
+
+      // Pass CLI_API_TOKEN from hapiSettings
+      if (hapiSettings.cliApiToken) {
+        envVars = { CLI_API_TOKEN: hapiSettings.cliApiToken };
+      }
+
+      if (isWindows) {
+        return {
+          command: {
+            shell: 'cmd.exe',
+            args: ['/c', hapiCommand],
+          },
+          env: envVars,
+        };
+      }
+
+      const shells = ['/bin/zsh', '/bin/bash', '/bin/sh'];
+      const shell = shells[0];
+      return {
+        command: {
+          shell,
+          args: ['-i', '-l', '-c', hapiCommand],
+        },
+        env: envVars,
+      };
+    }
+
+    const fullCommand = `${agentCommand} ${agentArgs.join(' ')}`.trim();
 
     // WSL environment: run through WSL with interactive login shell
     if (environment === 'wsl' && isWindows) {
       // Use $SHELL -ilc to load nvm/rbenv, add explicit exit to ensure shell exits
       const wslCommand = `exec $SHELL -ilc "${fullCommand}; exit \\$?"`;
       return {
-        shell: 'wsl.exe',
-        args: ['--', 'sh', '-c', wslCommand],
+        command: {
+          shell: 'wsl.exe',
+          args: ['--', 'sh', '-c', wslCommand],
+        },
+        env: envVars,
       };
     }
 
     // Native Windows - use cmd /c to ensure exit after command completion
     if (isWindows) {
       return {
-        shell: 'cmd.exe',
-        args: ['/c', fullCommand],
+        command: {
+          shell: 'cmd.exe',
+          args: ['/c', fullCommand],
+        },
+        env: envVars,
       };
     }
 
@@ -88,10 +149,20 @@ export function AgentTerminal({
     const shells = ['/bin/zsh', '/bin/bash', '/bin/sh'];
     const shell = shells[0]; // Will be validated by node-pty
     return {
-      shell,
-      args: ['-i', '-l', '-c', fullCommand],
+      command: {
+        shell,
+        args: ['-i', '-l', '-c', fullCommand],
+      },
+      env: envVars,
     };
-  }, [agentCommand, sessionId, initialized, environment]);
+  }, [
+    agentCommand,
+    sessionId,
+    initialized,
+    environment,
+    hapiSettings.cliApiToken,
+    hapiGlobalInstalled,
+  ]);
 
   // Handle exit with auto-close logic
   const handleExit = useCallback(() => {
@@ -254,6 +325,14 @@ export function AgentTerminal({
     [activated, onActivated, agentNotificationEnterDelay]
   );
 
+  // For hapi environment, wait for global check to complete before activating terminal
+  const effectiveIsActive = useMemo(() => {
+    if (environment === 'hapi' && hapiGlobalInstalled === null) {
+      return false;
+    }
+    return isActive;
+  }, [environment, hapiGlobalInstalled, isActive]);
+
   const {
     containerRef,
     isLoading,
@@ -266,7 +345,8 @@ export function AgentTerminal({
   } = useXterm({
     cwd,
     command,
-    isActive,
+    env,
+    isActive: effectiveIsActive,
     onExit: handleExit,
     onData: handleData,
     onCustomKey: handleCustomKey,
@@ -366,7 +446,7 @@ export function AgentTerminal({
         onClearSearch={clearSearch}
         theme={settings.theme}
       />
-      {isLoading && (
+      {(isLoading || (environment === 'hapi' && hapiGlobalInstalled === null)) && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div

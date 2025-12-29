@@ -49,9 +49,10 @@ function createSession(
   agentId: string,
   customAgents: Array<{ id: string; name: string; command: string }>
 ): Session {
-  // Handle WSL agent IDs (e.g., 'codex-wsl' -> base is 'codex')
+  // Handle WSL and Hapi agent IDs (e.g., 'codex-wsl' -> base is 'codex', 'claude-hapi' -> base is 'claude')
   const isWsl = agentId.endsWith('-wsl');
-  const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+  const isHapi = agentId.endsWith('-hapi');
+  const baseId = isWsl ? agentId.slice(0, -4) : isHapi ? agentId.slice(0, -5) : agentId;
 
   // Check if it's a custom agent
   const customAgent = customAgents.find((a) => a.id === baseId);
@@ -67,7 +68,7 @@ function createSession(
     initialized: false,
     repoPath,
     cwd,
-    environment: isWsl ? 'wsl' : 'native',
+    environment: isWsl ? 'wsl' : isHapi ? 'hapi' : 'native',
   };
 }
 
@@ -320,9 +321,10 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
 
   const handleNewSessionWithAgent = useCallback(
     (agentId: string, agentCommand: string) => {
-      // Handle WSL agent IDs (e.g., 'codex-wsl' -> base is 'codex')
+      // Handle WSL and Hapi agent IDs (e.g., 'codex-wsl' -> base is 'codex', 'claude-hapi' -> base is 'claude')
       const isWsl = agentId.endsWith('-wsl');
-      const baseId = isWsl ? agentId.slice(0, -4) : agentId;
+      const isHapi = agentId.endsWith('-hapi');
+      const baseId = isWsl ? agentId.slice(0, -4) : isHapi ? agentId.slice(0, -5) : agentId;
 
       // Get agent name for display
       const customAgent = customAgents.find((a) => a.id === baseId);
@@ -336,7 +338,7 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
         initialized: false,
         repoPath,
         cwd,
-        environment: isWsl ? 'wsl' : 'native',
+        environment: isWsl ? 'wsl' : isHapi ? 'hapi' : 'native',
       };
 
       addSession(newSession);

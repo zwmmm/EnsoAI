@@ -1,7 +1,11 @@
 import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 
 export interface HapiConfig {
   webappPort: number;
@@ -9,6 +13,11 @@ export interface HapiConfig {
   telegramBotToken: string;
   webappUrl: string;
   allowedChatIds: string;
+}
+
+export interface HapiGlobalStatus {
+  installed: boolean;
+  version?: string;
 }
 
 export interface HapiStatus {
@@ -19,21 +28,100 @@ export interface HapiStatus {
   error?: string;
 }
 
+const isWindows = process.platform === 'win32';
+
+/**
+ * Find user's default shell
+ */
+function findUserShell(): string {
+  const userShell = process.env.SHELL;
+  if (userShell && existsSync(userShell)) {
+    return userShell;
+  }
+  const shells = ['/bin/zsh', '/bin/bash', '/bin/sh'];
+  for (const shell of shells) {
+    if (existsSync(shell)) {
+      return shell;
+    }
+  }
+  return '/bin/sh';
+}
+
 class HapiServerManager extends EventEmitter {
   private process: ChildProcess | null = null;
   private status: HapiStatus = { running: false };
   private ready: boolean = false;
 
+  // Global installation cache
+  private globalStatus: HapiGlobalStatus | null = null;
+  private globalCacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 300000; // 5 minutes cache
+
   generateToken(): string {
     return randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Execute command in login shell to load user's environment
+   */
+  private async execInLoginShell(command: string, timeout = 5000): Promise<string> {
+    if (isWindows) {
+      const { stdout } = await execAsync(command, { timeout });
+      return stdout;
+    }
+
+    const shell = findUserShell();
+    const escapedCommand = command.replace(/"/g, '\\"');
+
+    try {
+      const { stdout } = await execAsync(`${shell} -ilc "${escapedCommand}"`, { timeout });
+      return stdout;
+    } catch {
+      const { stdout } = await execAsync(`${shell} -lc "${escapedCommand}"`, { timeout });
+      return stdout;
+    }
+  }
+
+  /**
+   * Check if hapi is globally installed (cached)
+   */
+  async checkGlobalInstall(forceRefresh = false): Promise<HapiGlobalStatus> {
+    // Return cached result if still valid
+    if (
+      !forceRefresh &&
+      this.globalStatus &&
+      Date.now() - this.globalCacheTimestamp < this.CACHE_TTL
+    ) {
+      return this.globalStatus;
+    }
+
+    try {
+      const stdout = await this.execInLoginShell('hapi --version', 3000);
+      const match = stdout.match(/(\d+\.\d+\.\d+)/);
+      this.globalStatus = {
+        installed: true,
+        version: match ? match[1] : undefined,
+      };
+    } catch {
+      this.globalStatus = { installed: false };
+    }
+
+    this.globalCacheTimestamp = Date.now();
+    return this.globalStatus;
+  }
+
+  /**
+   * Get the hapi command to use (global 'hapi' or 'npx -y @twsxtd/hapi')
+   */
+  async getHapiCommand(): Promise<string> {
+    const status = await this.checkGlobalInstall();
+    return status.installed ? 'hapi' : 'npx -y @twsxtd/hapi';
   }
 
   async start(config: HapiConfig): Promise<HapiStatus> {
     if (this.process) {
       return this.status;
     }
-
-    this.config = config;
 
     const env: Record<string, string> = {
       ...process.env,
@@ -54,7 +142,13 @@ class HapiServerManager extends EventEmitter {
     }
 
     try {
-      this.process = spawn('npx', ['-y', '@twsxtd/hapi', 'server'], {
+      // Check if hapi is globally installed
+      const hapiCommand = await this.getHapiCommand();
+      const isGlobal = hapiCommand === 'hapi';
+      const spawnCommand = isGlobal ? 'hapi' : 'npx';
+      const spawnArgs = isGlobal ? ['server'] : ['-y', '@twsxtd/hapi', 'server'];
+
+      this.process = spawn(spawnCommand, spawnArgs, {
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,

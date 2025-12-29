@@ -20,6 +20,11 @@ interface StoredHapiSettings {
 }
 
 export function registerHapiHandlers(): void {
+  // Check global hapi installation (cached)
+  ipcMain.handle(IPC_CHANNELS.HAPI_CHECK_GLOBAL, async (_, forceRefresh?: boolean) => {
+    return await hapiServerManager.checkGlobalInstall(forceRefresh);
+  });
+
   // Hapi Server handlers
   ipcMain.handle(IPC_CHANNELS.HAPI_START, async (_, config: HapiConfig) => {
     return await hapiServerManager.start(config);

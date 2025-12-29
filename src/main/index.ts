@@ -232,6 +232,18 @@ app.on('window-all-closed', async () => {
   app.quit();
 });
 
+// Handle before-quit event (covers Cmd+Q, dock quit, etc.)
+let isQuitting = false;
+app.on('before-quit', async (event) => {
+  if (!isQuitting) {
+    isQuitting = true;
+    event.preventDefault();
+    console.log('[app] Before quit, cleaning up...');
+    await cleanupAllResources();
+    app.quit();
+  }
+});
+
 // Handle uncaught errors
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -242,10 +254,11 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Handle SIGINT (Ctrl+C) and SIGTERM
-const handleSignal = async (signal: string) => {
-  console.log(`Received ${signal}, cleaning up...`);
-  await cleanupAllResources();
-  process.exit(0);
+const handleSignal = (signal: string) => {
+  console.log(`[app] Received ${signal}, triggering quit...`);
+  // Use app.quit() to trigger the normal quit flow (before-quit -> will-quit -> quit)
+  // The before-quit handler will do the cleanup
+  app.quit();
 };
 
 process.on('SIGINT', () => handleSignal('SIGINT'));

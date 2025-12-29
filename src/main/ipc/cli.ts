@@ -4,10 +4,18 @@ import { ipcMain } from 'electron';
 import { type CliDetectOptions, cliDetector } from '../services/cli/CliDetector';
 import { cliInstaller } from '../services/cli/CliInstaller';
 
+interface ExtendedCliDetectOptions extends CliDetectOptions {
+  forceRefresh?: boolean;
+}
+
 export function registerCliHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.CLI_DETECT,
-    async (_, customAgents?: CustomAgent[], options?: CliDetectOptions) => {
+    async (_, customAgents?: CustomAgent[], options?: ExtendedCliDetectOptions) => {
+      // Force refresh cache if requested
+      if (options?.forceRefresh) {
+        cliDetector.invalidateCache();
+      }
       return await cliDetector.detectAll(customAgents, options);
     }
   );

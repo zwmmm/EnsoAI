@@ -596,6 +596,8 @@ export const zhTranslations: Record<string, string> = {
   'Unable to load file': '无法加载文件',
   'Use .gitignore': '使用 .gitignore',
   // Hapi Remote Sharing
+  'Hapi Agents': 'Hapi 代理',
+  'Agents available through remote sharing': '可通过远程共享使用的代理',
   'Remote Sharing': '远程共享',
   'Remote Sharing (Hapi)': '远程共享 (Hapi)',
   'Share agent sessions remotely via Web and Telegram': '通过 Web 和 Telegram 远程共享 Agent 会话',

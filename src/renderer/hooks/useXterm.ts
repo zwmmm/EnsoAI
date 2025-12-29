@@ -35,6 +35,8 @@ export interface UseXtermOptions {
     shell: string;
     args: string[];
   };
+  /** Environment variables to pass to the terminal */
+  env?: Record<string, string>;
   /** Lazy init - only initialize when true */
   isActive?: boolean;
   /** Called when pty exits */
@@ -100,6 +102,7 @@ function useTerminalSettings() {
 export function useXterm({
   cwd,
   command,
+  env,
   isActive = true,
   onExit,
   onData,
@@ -418,6 +421,7 @@ export function useXterm({
         ...(command ? { shell: command.shell, args: command.args } : { shellConfig }),
         cols: terminal.cols,
         rows: terminal.rows,
+        env,
       });
 
       ptyIdRef.current = ptyId;

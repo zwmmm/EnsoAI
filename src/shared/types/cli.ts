@@ -1,5 +1,7 @@
 export type BuiltinAgentId = 'claude' | 'codex' | 'droid' | 'gemini' | 'auggie' | 'cursor';
 
+export type AgentEnvironment = 'native' | 'wsl' | 'hapi';
+
 export interface AgentCliInfo {
   id: string;
   name: string;
@@ -7,7 +9,7 @@ export interface AgentCliInfo {
   installed: boolean;
   version?: string;
   isBuiltin: boolean;
-  environment?: 'native' | 'wsl';
+  environment?: AgentEnvironment;
 }
 
 export interface CustomAgent {

@@ -15,6 +15,11 @@ interface HapiStatus {
   error?: string;
 }
 
+interface HapiGlobalStatus {
+  installed: boolean;
+  version?: string;
+}
+
 interface CloudflaredStatus {
   installed: boolean;
   version?: string;
@@ -28,6 +33,9 @@ export function HapiSettings() {
   const { hapiSettings, setHapiSettings } = useSettingsStore();
   const [status, setStatus] = React.useState<HapiStatus>({ running: false });
   const [loading, setLoading] = React.useState(false);
+
+  // Hapi global installation status
+  const [hapiGlobal, setHapiGlobal] = React.useState<HapiGlobalStatus>({ installed: false });
 
   // Cloudflared state
   const [cfStatus, setCfStatus] = React.useState<CloudflaredStatus>({
@@ -55,6 +63,11 @@ export function HapiSettings() {
 
   // Fetch initial status
   React.useEffect(() => {
+    // Check hapi global installation
+    window.electronAPI.hapi.checkGlobal().then((result) => {
+      setHapiGlobal(result);
+    });
+
     window.electronAPI.hapi.getStatus().then((s) => {
       setStatus(s);
       // Sync store enabled state with actual running state
@@ -200,7 +213,18 @@ export function HapiSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">{t('Remote Sharing (Hapi)')}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium">{t('Remote Sharing (Hapi)')}</h3>
+          {hapiGlobal.installed ? (
+            <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-600 dark:text-green-400">
+              v{hapiGlobal.version || '?'}
+            </span>
+          ) : (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              npx
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {t('Share agent sessions remotely via Web and Telegram')}
         </p>

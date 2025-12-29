@@ -119,6 +119,7 @@ export const IPC_CHANNELS = {
   SEARCH_CHECK_RG: 'search:checkRg',
 
   // Hapi Remote Sharing
+  HAPI_CHECK_GLOBAL: 'hapi:checkGlobal',
   HAPI_START: 'hapi:start',
   HAPI_STOP: 'hapi:stop',
   HAPI_RESTART: 'hapi:restart',

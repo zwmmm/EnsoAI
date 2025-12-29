@@ -86,6 +86,9 @@ export interface CliDetectOptions {
 
 class CliDetector {
   private cachedStatus: AgentCliStatus | null = null;
+  private cachedAgents: Map<string, AgentCliInfo> = new Map();
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 60000; // 1 minute cache
   private wslAvailable: boolean | null = null;
 
   /**
@@ -293,15 +296,26 @@ class CliDetector {
     }
   }
 
+  private isCacheValid(): boolean {
+    return Date.now() - this.cacheTimestamp < this.CACHE_TTL;
+  }
+
   async detectOne(agentId: string, customAgent?: CustomAgent): Promise<AgentCliInfo> {
+    // Check cache first
+    if (this.isCacheValid() && this.cachedAgents.has(agentId)) {
+      return this.cachedAgents.get(agentId)!;
+    }
+
     // Check if this is a WSL agent (id ends with -wsl)
     const isWslAgent = agentId.endsWith('-wsl');
     const baseAgentId = isWslAgent ? agentId.slice(0, -4) : agentId;
 
+    let result: AgentCliInfo;
+
     if (isWslAgent) {
       // Check if WSL is available first
       if (!(await this.isWslAvailable())) {
-        return {
+        result = {
           id: agentId,
           name: `${baseAgentId} (WSL)`,
           command: baseAgentId,
@@ -309,56 +323,294 @@ class CliDetector {
           isBuiltin: false,
           environment: 'wsl',
         };
+      } else {
+        const builtinConfig = BUILTIN_AGENT_CONFIGS.find((c) => c.id === baseAgentId);
+        if (builtinConfig) {
+          result = await this.detectBuiltinInWsl(builtinConfig);
+        } else if (customAgent) {
+          // For WSL custom agent, use the base agent info
+          const baseAgent = { ...customAgent, id: baseAgentId };
+          result = await this.detectCustomInWsl(baseAgent);
+        } else {
+          result = {
+            id: agentId,
+            name: `${baseAgentId} (WSL)`,
+            command: baseAgentId,
+            installed: false,
+            isBuiltin: false,
+            environment: 'wsl',
+          };
+        }
       }
-
-      const builtinConfig = BUILTIN_AGENT_CONFIGS.find((c) => c.id === baseAgentId);
+    } else {
+      const builtinConfig = BUILTIN_AGENT_CONFIGS.find((c) => c.id === agentId);
       if (builtinConfig) {
-        return this.detectBuiltinInWsl(builtinConfig);
-      }
-      if (customAgent) {
-        // For WSL custom agent, use the base agent info
-        const baseAgent = { ...customAgent, id: baseAgentId };
-        return this.detectCustomInWsl(baseAgent);
+        result = await this.detectBuiltin(builtinConfig);
+      } else if (customAgent) {
+        result = await this.detectCustom(customAgent);
+      } else {
+        result = {
+          id: agentId,
+          name: agentId,
+          command: agentId,
+          installed: false,
+          isBuiltin: false,
+        };
       }
     }
 
-    const builtinConfig = BUILTIN_AGENT_CONFIGS.find((c) => c.id === agentId);
-    if (builtinConfig) {
-      return this.detectBuiltin(builtinConfig);
+    // Cache the result
+    this.cachedAgents.set(agentId, result);
+    if (!this.isCacheValid()) {
+      this.cacheTimestamp = Date.now();
     }
-    if (customAgent) {
-      return this.detectCustom(customAgent);
+
+    return result;
+  }
+
+  /**
+   * Batch detect all agents in a single shell session (much faster)
+   */
+  private async batchDetectInShell(
+    configs: Array<{ id: string; command: string; versionFlag: string; versionRegex?: RegExp }>,
+    customAgents: CustomAgent[]
+  ): Promise<Map<string, { installed: boolean; version?: string }>> {
+    const results = new Map<string, { installed: boolean; version?: string }>();
+    const allCommands: Array<{ id: string; command: string; versionRegex?: RegExp }> = [];
+
+    // Add builtin configs
+    for (const config of configs) {
+      allCommands.push({
+        id: config.id,
+        command: `${config.command} ${config.versionFlag}`,
+        versionRegex: config.versionRegex,
+      });
     }
-    return {
-      id: agentId,
-      name: agentId,
-      command: agentId,
-      installed: false,
-      isBuiltin: false,
-    };
+
+    // Add custom agents
+    for (const agent of customAgents) {
+      allCommands.push({
+        id: agent.id,
+        command: `${agent.command} --version`,
+        versionRegex: /(\d+\.\d+\.\d+)/,
+      });
+    }
+
+    if (allCommands.length === 0) {
+      return results;
+    }
+
+    // Build batch command with markers
+    // Format: echo "###ID###" && command 2>&1 || true; echo "###ID###" && ...
+    const batchParts = allCommands.map(
+      ({ id, command }) => `echo "###${id}###" && (${command} 2>&1 || echo "__NOT_FOUND__")`
+    );
+    const batchCommand = batchParts.join('; ');
+
+    try {
+      const output = await this.execInLoginShell(batchCommand, 15000);
+
+      // Parse output by markers
+      for (const { id, versionRegex } of allCommands) {
+        const marker = `###${id}###`;
+        const markerIndex = output.indexOf(marker);
+        if (markerIndex === -1) {
+          results.set(id, { installed: false });
+          continue;
+        }
+
+        // Find content between this marker and next marker (or end)
+        const startIndex = markerIndex + marker.length;
+        const nextMarkerMatch = output.slice(startIndex).match(/###[\w-]+###/);
+        const endIndex = nextMarkerMatch
+          ? startIndex + (nextMarkerMatch.index ?? output.length)
+          : output.length;
+        const content = output.slice(startIndex, endIndex).trim();
+
+        if (content.includes('__NOT_FOUND__') || content.includes('command not found')) {
+          results.set(id, { installed: false });
+        } else {
+          const versionMatch = versionRegex ? content.match(versionRegex) : null;
+          results.set(id, {
+            installed: true,
+            version: versionMatch ? versionMatch[1] : undefined,
+          });
+        }
+      }
+    } catch {
+      // If batch fails, mark all as not installed
+      for (const { id } of allCommands) {
+        results.set(id, { installed: false });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Batch detect in WSL (single WSL shell session)
+   */
+  private async batchDetectInWsl(
+    configs: Array<{ id: string; command: string; versionFlag: string; versionRegex?: RegExp }>,
+    customAgents: CustomAgent[]
+  ): Promise<Map<string, { installed: boolean; version?: string }>> {
+    const results = new Map<string, { installed: boolean; version?: string }>();
+    const allCommands: Array<{ id: string; command: string; versionRegex?: RegExp }> = [];
+
+    for (const config of configs) {
+      allCommands.push({
+        id: `${config.id}-wsl`,
+        command: `${config.command} ${config.versionFlag}`,
+        versionRegex: config.versionRegex,
+      });
+    }
+
+    for (const agent of customAgents) {
+      allCommands.push({
+        id: `${agent.id}-wsl`,
+        command: `${agent.command} --version`,
+        versionRegex: /(\d+\.\d+\.\d+)/,
+      });
+    }
+
+    if (allCommands.length === 0) {
+      return results;
+    }
+
+    const batchParts = allCommands.map(
+      ({ id, command }) => `echo "###${id}###" && (${command} 2>&1 || echo "__NOT_FOUND__")`
+    );
+    const innerCommand = batchParts.join('; ');
+    const escapedCommand = innerCommand.replace(/"/g, '\\"');
+
+    try {
+      const { stdout } = await execAsync(`wsl -- sh -c 'exec $SHELL -ilc "${escapedCommand}"'`, {
+        timeout: 20000,
+      });
+
+      for (const { id, versionRegex } of allCommands) {
+        const marker = `###${id}###`;
+        const markerIndex = stdout.indexOf(marker);
+        if (markerIndex === -1) {
+          results.set(id, { installed: false });
+          continue;
+        }
+
+        const startIndex = markerIndex + marker.length;
+        const nextMarkerMatch = stdout.slice(startIndex).match(/###[\w-]+###/);
+        const endIndex = nextMarkerMatch
+          ? startIndex + (nextMarkerMatch.index ?? stdout.length)
+          : stdout.length;
+        const content = stdout.slice(startIndex, endIndex).trim();
+
+        if (content.includes('__NOT_FOUND__') || content.includes('command not found')) {
+          results.set(id, { installed: false });
+        } else {
+          const versionMatch = versionRegex ? content.match(versionRegex) : null;
+          results.set(id, {
+            installed: true,
+            version: versionMatch ? versionMatch[1] : undefined,
+          });
+        }
+      }
+    } catch {
+      for (const { id } of allCommands) {
+        results.set(id, { installed: false });
+      }
+    }
+
+    return results;
   }
 
   async detectAll(
     customAgents: CustomAgent[] = [],
     options: CliDetectOptions = {}
   ): Promise<AgentCliStatus> {
-    const builtinPromises = BUILTIN_AGENT_CONFIGS.map((config) => this.detectBuiltin(config));
-    const customPromises = customAgents.map((agent) => this.detectCustom(agent));
-
-    const promises: Promise<AgentCliInfo>[] = [...builtinPromises, ...customPromises];
-
-    if (options.includeWsl && (await this.isWslAvailable())) {
-      const wslBuiltinPromises = BUILTIN_AGENT_CONFIGS.map((config) =>
-        this.detectBuiltinInWsl(config)
-      );
-      const wslCustomPromises = customAgents.map((agent) => this.detectCustomInWsl(agent));
-      promises.push(...wslBuiltinPromises, ...wslCustomPromises);
+    // Return cached status if still valid
+    if (this.isCacheValid() && this.cachedStatus) {
+      return this.cachedStatus;
     }
 
-    const agents = await Promise.all(promises);
+    const agents: AgentCliInfo[] = [];
 
+    // Batch detect native agents (single shell session)
+    const nativeResults = await this.batchDetectInShell(BUILTIN_AGENT_CONFIGS, customAgents);
+
+    // Build native agent info
+    for (const config of BUILTIN_AGENT_CONFIGS) {
+      const result = nativeResults.get(config.id);
+      agents.push({
+        id: config.id,
+        name: config.name,
+        command: config.command,
+        installed: result?.installed ?? false,
+        version: result?.version,
+        isBuiltin: true,
+        environment: 'native',
+      });
+    }
+
+    for (const agent of customAgents) {
+      const result = nativeResults.get(agent.id);
+      agents.push({
+        id: agent.id,
+        name: agent.name,
+        command: agent.command,
+        installed: result?.installed ?? false,
+        version: result?.version,
+        isBuiltin: false,
+        environment: 'native',
+      });
+    }
+
+    // Batch detect WSL agents if enabled (single WSL shell session)
+    if (options.includeWsl && (await this.isWslAvailable())) {
+      const wslResults = await this.batchDetectInWsl(BUILTIN_AGENT_CONFIGS, customAgents);
+
+      for (const config of BUILTIN_AGENT_CONFIGS) {
+        const result = wslResults.get(`${config.id}-wsl`);
+        agents.push({
+          id: `${config.id}-wsl`,
+          name: `${config.name} (WSL)`,
+          command: config.command,
+          installed: result?.installed ?? false,
+          version: result?.version,
+          isBuiltin: true,
+          environment: 'wsl',
+        });
+      }
+
+      for (const agent of customAgents) {
+        const result = wslResults.get(`${agent.id}-wsl`);
+        agents.push({
+          id: `${agent.id}-wsl`,
+          name: `${agent.name} (WSL)`,
+          command: agent.command,
+          installed: result?.installed ?? false,
+          version: result?.version,
+          isBuiltin: false,
+          environment: 'wsl',
+        });
+      }
+    }
+
+    // Update caches
     this.cachedStatus = { agents };
+    this.cacheTimestamp = Date.now();
+    for (const agent of agents) {
+      this.cachedAgents.set(agent.id, agent);
+    }
+
     return this.cachedStatus;
+  }
+
+  /**
+   * Force refresh cache on next detection
+   */
+  invalidateCache(): void {
+    this.cacheTimestamp = 0;
+    this.cachedAgents.clear();
+    this.cachedStatus = null;
   }
 
   getCached(): AgentCliStatus | null {

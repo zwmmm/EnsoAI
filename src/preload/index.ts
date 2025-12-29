@@ -274,7 +274,7 @@ const electronAPI = {
   cli: {
     detect: (
       customAgents?: CustomAgent[],
-      options?: { includeWsl?: boolean }
+      options?: { includeWsl?: boolean; forceRefresh?: boolean }
     ): Promise<AgentCliStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLI_DETECT, customAgents, options),
     detectOne: (agentId: string, customAgent?: CustomAgent): Promise<AgentCliInfo> =>
@@ -405,6 +405,8 @@ const electronAPI = {
 
   // Hapi Remote Sharing
   hapi: {
+    checkGlobal: (forceRefresh?: boolean): Promise<{ installed: boolean; version?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.HAPI_CHECK_GLOBAL, forceRefresh),
     start: (config: {
       webappPort: number;
       cliApiToken: string;

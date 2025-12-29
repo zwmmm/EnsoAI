@@ -100,6 +100,7 @@ export function AgentSettings() {
     agentSettings,
     customAgents,
     wslEnabled,
+    hapiSettings,
     setAgentEnabled,
     setAgentDefault,
     addCustomAgent,
@@ -112,24 +113,29 @@ export function AgentSettings() {
   const [editingAgent, setEditingAgent] = React.useState<CustomAgent | null>(null);
   const [isAddingAgent, setIsAddingAgent] = React.useState(false);
 
-  const detectAllAgents = React.useCallback(() => {
-    setLoadingAgents(new Set(['all']));
-    setCliStatus({});
+  const detectAllAgents = React.useCallback(
+    (forceRefresh = false) => {
+      setLoadingAgents(new Set(['all']));
+      if (forceRefresh) {
+        setCliStatus({});
+      }
 
-    window.electronAPI.cli
-      .detect(customAgents, { includeWsl: wslEnabled })
-      .then((result) => {
-        const statusMap: Record<string, AgentCliInfo> = {};
-        for (const agent of result.agents) {
-          statusMap[agent.id] = agent;
-        }
-        setCliStatus(statusMap);
-        setLoadingAgents(new Set());
-      })
-      .catch(() => {
-        setLoadingAgents(new Set());
-      });
-  }, [customAgents, wslEnabled]);
+      window.electronAPI.cli
+        .detect(customAgents, { includeWsl: wslEnabled, forceRefresh })
+        .then((result) => {
+          const statusMap: Record<string, AgentCliInfo> = {};
+          for (const agent of result.agents) {
+            statusMap[agent.id] = agent;
+          }
+          setCliStatus(statusMap);
+          setLoadingAgents(new Set());
+        })
+        .catch(() => {
+          setLoadingAgents(new Set());
+        });
+    },
+    [customAgents, wslEnabled]
+  );
 
   React.useEffect(() => {
     detectAllAgents();
@@ -171,7 +177,10 @@ export function AgentSettings() {
 
   const isRefreshing = loadingAgents.size > 0;
 
-  // Get all agents including WSL variants
+  // Hapi-supported agent IDs (only these can run through hapi)
+  const HAPI_SUPPORTED_AGENTS: BuiltinAgentId[] = ['claude', 'codex', 'gemini'];
+
+  // Get all agents including WSL and Hapi variants
   const allAgentInfos = React.useMemo(() => {
     const infos: Array<{
       id: string;
@@ -202,6 +211,39 @@ export function AgentSettings() {
     return infos;
   }, [cliStatus]);
 
+  // Get Hapi agents (virtual agents that use hapi wrapper)
+  const hapiAgentInfos = React.useMemo(() => {
+    if (!hapiSettings.enabled) return [];
+
+    const infos: Array<{
+      id: string;
+      baseId: BuiltinAgentId;
+      info: { name: string; description: string };
+      cli?: AgentCliInfo;
+    }> = [];
+
+    for (const agentId of HAPI_SUPPORTED_AGENTS) {
+      const baseInfo = BUILTIN_AGENT_INFO[agentId];
+      const nativeCli = cliStatus[agentId];
+
+      // Hapi agent is available if the base CLI is installed
+      if (nativeCli?.installed) {
+        infos.push({
+          id: `${agentId}-hapi`,
+          baseId: agentId,
+          info: { name: `${baseInfo.name}`, description: baseInfo.description },
+          cli: {
+            ...nativeCli,
+            id: `${agentId}-hapi`,
+            environment: 'hapi',
+          },
+        });
+      }
+    }
+
+    return infos;
+  }, [cliStatus, hapiSettings.enabled]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -215,7 +257,7 @@ export function AgentSettings() {
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={detectAllAgents}
+          onClick={() => detectAllAgents(true)}
           disabled={isRefreshing}
         >
           <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
@@ -229,7 +271,7 @@ export function AgentSettings() {
       </p>
 
       {/* Builtin Agents */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {allAgentInfos.map(({ id: agentId, info, cli }) => {
           const isLoading = isRefreshing;
           const isInstalled = cli?.installed ?? false;
@@ -241,13 +283,13 @@ export function AgentSettings() {
             <div
               key={agentId}
               className={cn(
-                'flex items-center justify-between rounded-lg border p-4',
+                'flex items-center justify-between rounded-lg border px-3 py-2',
                 !isLoading && !isInstalled && 'opacity-50'
               )}
             >
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{info.name}</span>
+                  <span className="font-medium text-sm">{info.name}</span>
                   {!isLoading && cli?.version && (
                     <span className="text-xs text-muted-foreground">v{cli.version}</span>
                   )}
@@ -262,26 +304,25 @@ export function AgentSettings() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{info.description}</p>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4 shrink-0">
                 {isLoading ? (
-                  <div className="flex h-5 w-24 items-center justify-center">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                  <div className="flex h-5 w-20 items-center justify-center">
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{t('Enable')}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">{t('Enable')}</span>
                       <Switch
                         checked={config?.enabled && canEnable}
                         onCheckedChange={(checked) => handleEnabledChange(agentId, checked)}
                         disabled={!canEnable}
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{t('Default')}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">{t('Default')}</span>
                       <Switch
                         checked={config?.isDefault ?? false}
                         onCheckedChange={() => handleDefaultChange(agentId)}
@@ -296,21 +337,75 @@ export function AgentSettings() {
         })}
       </div>
 
+      {/* Hapi Agents Section - shown when remote sharing is enabled */}
+      {hapiSettings.enabled && hapiAgentInfos.length > 0 && (
+        <div className="border-t pt-4">
+          <div className="mb-3">
+            <h3 className="text-base font-medium">{t('Hapi Agents')}</h3>
+            <p className="text-xs text-muted-foreground">
+              {t('Agents available through remote sharing')}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {hapiAgentInfos.map(({ id: agentId, info, cli }) => {
+              const config = agentSettings[agentId];
+              const canEnable = cli?.installed ?? false;
+              const canSetDefault = canEnable && config?.enabled;
+
+              return (
+                <div
+                  key={agentId}
+                  className="flex items-center justify-between rounded-lg border px-3 py-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{info.name}</span>
+                      <span className="whitespace-nowrap rounded bg-orange-500/10 px-1.5 py-0.5 text-xs text-orange-600 dark:text-orange-400">
+                        Hapi
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">{t('Enable')}</span>
+                      <Switch
+                        checked={config?.enabled && canEnable}
+                        onCheckedChange={(checked) => handleEnabledChange(agentId, checked)}
+                        disabled={!canEnable}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">{t('Default')}</span>
+                      <Switch
+                        checked={config?.isDefault ?? false}
+                        onCheckedChange={() => handleDefaultChange(agentId)}
+                        disabled={!canSetDefault}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Custom Agents Section */}
-      <div className="border-t pt-6">
-        <div className="flex items-center justify-between">
+      <div className="border-t pt-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-lg font-medium">{t('Custom Agent')}</h3>
-            <p className="text-sm text-muted-foreground">{t('Add custom CLI tools')}</p>
+            <h3 className="text-base font-medium">{t('Custom Agent')}</h3>
+            <p className="text-xs text-muted-foreground">{t('Add custom CLI tools')}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setIsAddingAgent(true)}>
-            <Plus className="mr-1 h-4 w-4" />
+            <Plus className="mr-1 h-3 w-3" />
             {t('Add')}
           </Button>
         </div>
 
         {customAgents.length > 0 && (
-          <div className="mt-4 space-y-3">
+          <div className="space-y-2">
             {customAgents.map((agent) => {
               const cli = cliStatus[agent.id];
               const isLoading = isRefreshing;
@@ -323,14 +418,14 @@ export function AgentSettings() {
                 <div
                   key={agent.id}
                   className={cn(
-                    'rounded-lg border p-4',
+                    'rounded-lg border px-3 py-2',
                     !isLoading && !isInstalled && 'opacity-50'
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{agent.name}</span>
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="font-medium text-sm">{agent.name}</span>
+                      <code className="rounded bg-muted px-1 py-0.5 text-xs truncate">
                         {agent.command}
                       </code>
                       {!isLoading && cli?.version && (
@@ -342,53 +437,48 @@ export function AgentSettings() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => setEditingAgent(agent)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveAgent(agent.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="flex items-center gap-4 shrink-0">
+                      {isLoading ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{t('Enable')}</span>
+                            <Switch
+                              checked={config?.enabled && canEnable}
+                              onCheckedChange={(checked) => handleEnabledChange(agent.id, checked)}
+                              disabled={!canEnable}
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{t('Default')}</span>
+                            <Switch
+                              checked={config?.isDefault ?? false}
+                              onCheckedChange={() => handleDefaultChange(agent.id)}
+                              disabled={!canSetDefault}
+                            />
+                          </div>
+                          <div className="flex items-center gap-0.5 ml-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setEditingAgent(agent)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveAgent(agent.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </div>
-                  {agent.description && (
-                    <p className="mt-1 text-sm text-muted-foreground">{agent.description}</p>
-                  )}
-                  <div className="mt-3 flex items-center gap-6">
-                    {isLoading ? (
-                      <div className="flex h-5 w-24 items-center">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{t('Enable')}</span>
-                          <Switch
-                            checked={config?.enabled && canEnable}
-                            onCheckedChange={(checked) => handleEnabledChange(agent.id, checked)}
-                            disabled={!canEnable}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{t('Default')}</span>
-                          <Switch
-                            checked={config?.isDefault ?? false}
-                            onCheckedChange={() => handleDefaultChange(agent.id)}
-                            disabled={!canSetDefault}
-                          />
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
               );
@@ -397,8 +487,8 @@ export function AgentSettings() {
         )}
 
         {customAgents.length === 0 && !isAddingAgent && (
-          <div className="mt-4 rounded-lg border border-dashed p-6 text-center">
-            <p className="text-sm text-muted-foreground">{t('No custom agents yet')}</p>
+          <div className="rounded-lg border border-dashed p-4 text-center">
+            <p className="text-xs text-muted-foreground">{t('No custom agents yet')}</p>
           </div>
         )}
       </div>
