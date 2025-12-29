@@ -212,6 +212,7 @@ export function AgentSettings() {
   }, [cliStatus]);
 
   // Get Hapi agents (virtual agents that use hapi wrapper)
+  // On Windows, CLI might be installed in WSL only, so check both native and WSL
   const hapiAgentInfos = React.useMemo(() => {
     if (!hapiSettings.enabled) return [];
 
@@ -225,15 +226,17 @@ export function AgentSettings() {
     for (const agentId of HAPI_SUPPORTED_AGENTS) {
       const baseInfo = BUILTIN_AGENT_INFO[agentId];
       const nativeCli = cliStatus[agentId];
+      const wslCli = cliStatus[`${agentId}-wsl`];
 
-      // Hapi agent is available if the base CLI is installed
-      if (nativeCli?.installed) {
+      // Hapi agent is available if the base CLI is installed in native OR WSL
+      const baseCli = nativeCli?.installed ? nativeCli : wslCli?.installed ? wslCli : null;
+      if (baseCli) {
         infos.push({
           id: `${agentId}-hapi`,
           baseId: agentId,
           info: { name: `${baseInfo.name}`, description: baseInfo.description },
           cli: {
-            ...nativeCli,
+            ...baseCli,
             id: `${agentId}-hapi`,
             environment: 'hapi',
           },

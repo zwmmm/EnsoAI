@@ -226,22 +226,21 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', async () => {
-  // Cleanup all resources before quitting
-  await cleanupAllResources();
+app.on('window-all-closed', () => {
   app.quit();
 });
 
-// Handle before-quit event (covers Cmd+Q, dock quit, etc.)
-let isQuitting = false;
-app.on('before-quit', async (event) => {
-  if (!isQuitting) {
-    isQuitting = true;
-    event.preventDefault();
-    console.log('[app] Before quit, cleaning up...');
-    await cleanupAllResources();
-    app.quit();
-  }
+// Cleanup before app quits (covers all quit methods: Cmd+Q, window close, etc.)
+app.on('will-quit', (event) => {
+  event.preventDefault();
+  console.log('[app] Will quit, cleaning up...');
+  cleanupAllResources()
+    .catch((err) => console.error('[app] Cleanup error:', err))
+    .finally(() => {
+      // Remove the listener to allow quit after cleanup
+      app.removeAllListeners('will-quit');
+      app.quit();
+    });
 });
 
 // Handle uncaught errors
@@ -254,12 +253,21 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Handle SIGINT (Ctrl+C) and SIGTERM
-const handleSignal = (signal: string) => {
-  console.log(`[app] Received ${signal}, triggering quit...`);
-  // Use app.quit() to trigger the normal quit flow (before-quit -> will-quit -> quit)
-  // The before-quit handler will do the cleanup
-  app.quit();
-};
+// Note: In dev mode with electron, signals may be handled by the parent process
+// Use sync cleanup and immediate exit to ensure process terminates
+process.on('SIGINT', () => {
+  console.log('[app] Received SIGINT, exiting...');
+  cleanupAllResources()
+    .catch((err) => console.error('[app] Cleanup error:', err))
+    .finally(() => process.exit(0));
+  // Force exit after timeout in case cleanup hangs
+  setTimeout(() => process.exit(1), 3000);
+});
 
-process.on('SIGINT', () => handleSignal('SIGINT'));
-process.on('SIGTERM', () => handleSignal('SIGTERM'));
+process.on('SIGTERM', () => {
+  console.log('[app] Received SIGTERM, exiting...');
+  cleanupAllResources()
+    .catch((err) => console.error('[app] Cleanup error:', err))
+    .finally(() => process.exit(0));
+  setTimeout(() => process.exit(1), 3000);
+});

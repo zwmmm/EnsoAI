@@ -87,13 +87,21 @@ export function SessionBar({
     // Use Promise.all for parallel detection (main process caches results)
     const detectPromises = enabledAgentIds.map(async (agentId) => {
       // Handle Hapi agents: they are virtual, based on base CLI installation
+      // On Windows, CLI might be installed in WSL only, so check both native and WSL
       const isHapi = agentId.endsWith('-hapi');
       if (isHapi) {
         if (!hapiSettings.enabled) return;
         const baseId = agentId.slice(0, -5);
         const customAgent = customAgents.find((a) => a.id === baseId);
-        const result = await window.electronAPI.cli.detectOne(baseId, customAgent);
-        if (result.installed) {
+        // Check native first
+        const nativeResult = await window.electronAPI.cli.detectOne(baseId, customAgent);
+        if (nativeResult.installed) {
+          newInstalled.add(agentId);
+          return;
+        }
+        // If not installed natively, check WSL (Windows only)
+        const wslResult = await window.electronAPI.cli.detectOne(`${baseId}-wsl`, customAgent);
+        if (wslResult.installed) {
           newInstalled.add(agentId);
         }
         return;
