@@ -1,4 +1,4 @@
-import { Download, ExternalLink, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { Button } from './ui/button';
@@ -24,7 +24,6 @@ interface UpdateStatus {
     transferred: number;
   };
   error?: string;
-  downloadUrl?: string; // For macOS manual update
 }
 
 export function UpdateNotification() {
@@ -36,13 +35,8 @@ export function UpdateNotification() {
     const cleanup = window.electronAPI.updater.onStatus((newStatus) => {
       setStatus(newStatus as UpdateStatus);
 
-      // Auto-open dialog when:
-      // - Update downloaded (Windows)
-      // - Update available with downloadUrl (macOS)
-      if (
-        newStatus.status === 'downloaded' ||
-        (newStatus.status === 'available' && (newStatus as UpdateStatus).downloadUrl)
-      ) {
+      // Auto-open dialog when update is downloaded and ready to install
+      if (newStatus.status === 'downloaded') {
         setDialogOpen(true);
       }
     });
@@ -53,13 +47,6 @@ export function UpdateNotification() {
   const handleInstall = useCallback(() => {
     window.electronAPI.updater.quitAndInstall();
   }, []);
-
-  const handleOpenDownload = useCallback(() => {
-    if (status?.downloadUrl) {
-      window.electronAPI.shell.openExternal(status.downloadUrl);
-      setDialogOpen(false);
-    }
-  }, [status?.downloadUrl]);
 
   const handleLater = useCallback(() => {
     setDialogOpen(false);
@@ -72,7 +59,7 @@ export function UpdateNotification() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Show downloading indicator in corner (Windows only)
+  // Show downloading indicator in corner
   if (status?.status === 'downloading' && status.progress) {
     return (
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
@@ -95,52 +82,30 @@ export function UpdateNotification() {
     );
   }
 
-  // macOS: manual download dialog
-  const isMacOSManual = status?.status === 'available' && status.downloadUrl;
-
-  // Windows: auto-install dialog
-  const isWindowsReady = status?.status === 'downloaded';
+  // Show install dialog when update is downloaded
+  if (status?.status !== 'downloaded') {
+    return null;
+  }
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogPopup className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isMacOSManual ? (
-              <Download className="h-5 w-5 text-primary" />
-            ) : (
-              <RefreshCw className="h-5 w-5 text-primary" />
-            )}
-            {isMacOSManual ? t('New version available') : t('Update ready')}
+            <RefreshCw className="h-5 w-5 text-primary" />
+            {t('Update ready')}
           </DialogTitle>
           <DialogDescription>
-            {isMacOSManual ? (
-              <>
-                {t('Version {{version}} is available. Please download it manually.', {
-                  version: status?.info?.version || '',
-                })}
-              </>
-            ) : (
-              <>
-                {t('Version {{version}} has been downloaded. Restart now to install?', {
-                  version: status?.info?.version || '',
-                })}
-              </>
-            )}
+            {t('Version {{version}} has been downloaded. Restart now to install?', {
+              version: status?.info?.version || '',
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter variant="bare">
           <Button variant="outline" onClick={handleLater}>
             {t('Later')}
           </Button>
-          {isMacOSManual ? (
-            <Button onClick={handleOpenDownload}>
-              <ExternalLink className="mr-2 h-4 w-4" />
-              {t('Go to download')}
-            </Button>
-          ) : (
-            <Button onClick={handleInstall}>{t('Restart now')}</Button>
-          )}
+          <Button onClick={handleInstall}>{t('Restart now')}</Button>
         </DialogFooter>
       </DialogPopup>
     </Dialog>
