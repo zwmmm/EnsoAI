@@ -150,12 +150,18 @@ class CliDetector {
     const home = process.env.HOME || process.env.USERPROFILE || homedir();
     const currentPath = process.env.PATH || '';
 
+    // nvm-windows: NVM_SYMLINK points to current Node.js version
+    const nvmSymlink = process.env.NVM_SYMLINK;
+    // scoop: SCOOP env var for custom install path, otherwise default ~/scoop
+    const scoopHome = process.env.SCOOP || join(home, 'scoop');
+
     const paths = [
       currentPath,
       join(home, 'AppData', 'Roaming', 'npm'),
       join(home, '.volta', 'bin'),
-      join(home, 'scoop', 'shims'),
+      join(scoopHome, 'shims'),
       join(home, '.bun', 'bin'),
+      nvmSymlink,
     ];
     return paths.filter(Boolean).join(delimiter);
   }
@@ -370,6 +376,7 @@ class CliDetector {
 
   /**
    * Batch detect all agents in a single shell session (much faster)
+   * Windows: Falls back to individual detection (cmd doesn't support Unix shell syntax)
    */
   private async batchDetectInShell(
     configs: Array<{ id: string; command: string; versionFlag: string; versionRegex?: RegExp }>,
@@ -400,7 +407,26 @@ class CliDetector {
       return results;
     }
 
-    // Build batch command with markers
+    // Windows: cmd doesn't support Unix shell syntax (&&, ||, 2>&1, ;)
+    // Fall back to individual detection
+    if (isWindows) {
+      const detectPromises = allCommands.map(async ({ id, command, versionRegex }) => {
+        try {
+          const output = await this.execInLoginShell(command, 5000);
+          const versionMatch = versionRegex ? output.match(versionRegex) : null;
+          results.set(id, {
+            installed: true,
+            version: versionMatch ? versionMatch[1] : undefined,
+          });
+        } catch {
+          results.set(id, { installed: false });
+        }
+      });
+      await Promise.all(detectPromises);
+      return results;
+    }
+
+    // Unix: Use batch command with markers for better performance
     // Format: echo "###ID###" && command 2>&1 || true; echo "###ID###" && ...
     const batchParts = allCommands.map(
       ({ id, command }) => `echo "###${id}###" && (${command} 2>&1 || echo "__NOT_FOUND__")`
