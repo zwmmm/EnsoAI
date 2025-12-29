@@ -10,8 +10,8 @@ import type {
   ContentSearchResult,
   CustomAgent,
   DetectedApp,
-  FileChange,
   FileChangeEvent,
+  FileChangesResult,
   FileDiff,
   FileEntry,
   FileSearchParams,
@@ -59,7 +59,7 @@ const electronAPI = {
     getDiff: (workdir: string, options?: { staged?: boolean }): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_DIFF, workdir, options),
     init: (workdir: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.GIT_INIT, workdir),
-    getFileChanges: (workdir: string): Promise<FileChange[]> =>
+    getFileChanges: (workdir: string): Promise<FileChangesResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_FILE_CHANGES, workdir),
     getFileDiff: (workdir: string, filePath: string, staged: boolean): Promise<FileDiff> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_FILE_DIFF, workdir, filePath, staged),

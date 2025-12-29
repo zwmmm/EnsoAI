@@ -4,6 +4,7 @@ import type {
   CommitFileChange,
   FileChange,
   FileChangeStatus,
+  FileChangesResult,
   FileDiff,
   GitBranch,
   GitLogEntry,
@@ -42,12 +43,32 @@ export class GitService {
 
   async getBranches(): Promise<GitBranch[]> {
     const result = await this.git.branch(['-a', '-v']);
-    return Object.entries(result.branches).map(([name, info]) => ({
+    const branches = Object.entries(result.branches).map(([name, info]) => ({
       name,
       current: info.current,
       commit: info.commit,
       label: info.label,
     }));
+
+    // Empty repo (no commits yet) - return placeholder for current branch
+    if (branches.length === 0) {
+      try {
+        // Use symbolic-ref to get branch name in empty repo (rev-parse fails without commits)
+        const currentBranch = await this.git.raw(['symbolic-ref', '--short', 'HEAD']);
+        return [
+          {
+            name: currentBranch.trim(),
+            current: true,
+            commit: '',
+            label: '(no commits yet)',
+          },
+        ];
+      } catch {
+        return [];
+      }
+    }
+
+    return branches;
   }
 
   async getLog(maxCount = 50, skip = 0): Promise<GitLogEntry[]> {
@@ -58,7 +79,17 @@ export class GitService {
     if (skip > 0) {
       options.push(`--skip=${skip}`);
     }
-    const result = await this.git.raw(['log', ...options]);
+
+    let result: string;
+    try {
+      result = await this.git.raw(['log', ...options]);
+    } catch (error) {
+      // Empty repo (no commits yet) - return empty array
+      if (error instanceof Error && error.message.includes('does not have any commits yet')) {
+        return [];
+      }
+      throw error;
+    }
     const entries = result
       .trim()
       .split('\n')
@@ -119,9 +150,23 @@ export class GitService {
     await this.git.init();
   }
 
-  async getFileChanges(): Promise<FileChange[]> {
+  async getFileChanges(): Promise<FileChangesResult> {
     const status: StatusResult = await this.git.status();
     const changes: FileChange[] = [];
+
+    // Directories to ignore (commonly large and should be in .gitignore)
+    const ignoredPrefixes = ['node_modules/', '.pnpm/', 'dist/', 'out/', '.next/', 'build/'];
+    const skippedDirsSet = new Set<string>();
+
+    const checkIgnored = (filePath: string): boolean => {
+      for (const prefix of ignoredPrefixes) {
+        if (filePath.startsWith(prefix)) {
+          skippedDirsSet.add(prefix.slice(0, -1)); // Remove trailing slash
+          return true;
+        }
+      }
+      return false;
+    };
 
     // Build a map of renamed files for quick lookup
     const renamedMap = new Map<string, string>();
@@ -133,6 +178,12 @@ export class GitService {
     // Each file has 'index' (staging area vs HEAD) and 'working_dir' (working tree vs index)
     for (const file of status.files) {
       const filePath = file.path;
+
+      // Skip files in ignored directories (performance optimization)
+      if (checkIgnored(filePath)) {
+        continue;
+      }
+
       const indexStatus = file.index;
       const workingDirStatus = file.working_dir;
 
@@ -178,7 +229,8 @@ export class GitService {
       }
     }
 
-    return changes;
+    const skippedDirs = skippedDirsSet.size > 0 ? Array.from(skippedDirsSet) : undefined;
+    return { changes, skippedDirs };
   }
 
   async getFileDiff(filePath: string, staged: boolean): Promise<FileDiff> {

@@ -3,7 +3,7 @@ import { execSync, spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { type FileChangeStatus, IPC_CHANNELS } from '@shared/types';
-import { type BrowserWindow, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { GitService } from '../services/git/GitService';
 import { findLoginShell, getEnhancedPath } from '../services/terminal/PtyManager';
 
@@ -122,11 +122,20 @@ export function registerGitHandlers(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.GIT_INIT, async (_, workdir: string) => {
-    const resolved = validateWorkdir(workdir);
-    const git = getGitService(resolved);
+    const resolved = path.resolve(workdir);
+
+    // For git init, only validate path exists and is a directory (no .git check)
+    if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+      throw new Error('Invalid workdir: path does not exist or is not a directory');
+    }
+
+    // Create GitService and init
+    const git = new GitService(resolved);
     await git.init();
-    // Clear the service cache after init to get fresh instance
-    gitServices.delete(resolved);
+
+    // Register as authorized and cache the service
+    authorizedWorkdirs.add(resolved);
+    gitServices.set(resolved, git);
   });
 
   ipcMain.handle(IPC_CHANNELS.GIT_FILE_CHANGES, async (_, workdir: string) => {

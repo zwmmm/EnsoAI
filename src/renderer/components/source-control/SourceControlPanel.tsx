@@ -70,11 +70,14 @@ export function SourceControlPanel({
   const [expandedCommitHash, setExpandedCommitHash] = useState<string | null>(null);
 
   const {
-    data: changes,
+    data: fileChangesResult,
     isLoading,
     isFetching,
     refetch,
   } = useFileChanges(rootPath ?? null, isActive);
+
+  const changes = fileChangesResult?.changes;
+  const skippedDirs = fileChangesResult?.skippedDirs;
 
   // Git sync status
   const { data: gitStatus, refetch: refetchStatus } = useGitStatus(rootPath ?? null, isActive);
@@ -366,6 +369,15 @@ export function SourceControlPanel({
 
                 {changesExpanded && (
                   <>
+                    {/* Warning for skipped directories */}
+                    {skippedDirs && skippedDirs.length > 0 && (
+                      <div className="mx-2 mt-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
+                        <span className="font-medium">{t('Performance warning')}:</span>{' '}
+                        {t('Skipped {{dirs}} (not in .gitignore)', {
+                          dirs: skippedDirs.join(', '),
+                        })}
+                      </div>
+                    )}
                     <div className="flex-1 overflow-hidden min-h-0">
                       <ChangesList
                         staged={staged}

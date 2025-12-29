@@ -47,6 +47,11 @@ export interface FileChange {
   originalPath?: string; // for renames
 }
 
+export interface FileChangesResult {
+  changes: FileChange[];
+  skippedDirs?: string[]; // Directories skipped for performance (e.g., node_modules not in .gitignore)
+}
+
 export interface FileDiff {
   path: string;
   original: string; // HEAD version (empty for new files)

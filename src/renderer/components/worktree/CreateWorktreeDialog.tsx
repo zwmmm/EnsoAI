@@ -3,6 +3,18 @@ import { GitBranch, Plus } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxSeparator,
+} from '@/components/ui/combobox';
+import {
   Dialog,
   DialogClose,
   DialogDescription,
@@ -15,14 +27,12 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useI18n } from '@/i18n';
+
+// Get display name for branch (remove remotes/ prefix for remote branches)
+const getBranchDisplayName = (name: string) => {
+  return name.startsWith('remotes/') ? name.replace('remotes/', '') : name;
+};
 
 interface CreateWorktreeDialogProps {
   branches: GitBranchType[];
@@ -57,17 +67,55 @@ export function CreateWorktreeDialog({
     return [home, 'ensoai', 'workspaces', projectBaseName, branchName].join(pathSep);
   };
 
-  const localBranches = branches.filter((b) => !b.name.startsWith('remotes/'));
-  const remoteBranches = branches.filter((b) => b.name.startsWith('remotes/'));
+  // Branch item type for combobox
+  type BranchItem = { id: string; label: string; value: string };
+  type BranchGroup = { value: string; label: string; items: BranchItem[] };
+
+  // Convert branches to grouped combobox items format
+  const branchGroups = React.useMemo((): BranchGroup[] => {
+    const localItems: BranchItem[] = [];
+    const remoteItems: BranchItem[] = [];
+
+    for (const b of branches) {
+      const item: BranchItem = {
+        id: b.name,
+        label: getBranchDisplayName(b.name) + (b.current ? ` (${t('Current')})` : ''),
+        value: b.name,
+      };
+      if (b.name.startsWith('remotes/')) {
+        remoteItems.push(item);
+      } else {
+        localItems.push(item);
+      }
+    }
+
+    const groups: BranchGroup[] = [];
+    if (localItems.length > 0) {
+      groups.push({ value: 'local', label: t('Local branches'), items: localItems });
+    }
+    if (remoteItems.length > 0) {
+      groups.push({ value: 'remote', label: t('Remote branches'), items: remoteItems });
+    }
+    return groups;
+  }, [branches, t]);
 
   // Use current branch as default base
   const currentBranch = branches.find((b) => b.current);
+  const defaultBranchItem = React.useMemo(() => {
+    if (!currentBranch) return null;
+    for (const group of branchGroups) {
+      const found = group.items.find((item) => item.value === currentBranch.name);
+      if (found) return found;
+    }
+    return null;
+  }, [branchGroups, currentBranch]);
 
+  // Initialize baseBranch state when dialog opens
   React.useEffect(() => {
-    if (open && !baseBranch && currentBranch) {
+    if (open && currentBranch && !baseBranch) {
       setBaseBranch(currentBranch.name);
     }
-  }, [open, baseBranch, currentBranch]);
+  }, [open, currentBranch, baseBranch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,47 +201,44 @@ export function CreateWorktreeDialog({
               </FieldDescription>
             </Field>
 
-            {/* Base Branch Selection */}
+            {/* Base Branch Selection with Search */}
             <Field>
               <FieldLabel>{t('Base branch')}</FieldLabel>
-              <Select value={baseBranch} onValueChange={(v) => setBaseBranch(v || '')}>
-                <SelectTrigger>
-                  <SelectValue>{baseBranch || t('Choose base branch...')}</SelectValue>
-                </SelectTrigger>
-                <SelectPopup>
-                  {localBranches.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                        {t('Local branches')}
-                      </div>
-                      {localBranches.map((branch) => (
-                        <SelectItem key={branch.name} value={branch.name}>
-                          <GitBranch className="mr-2 h-4 w-4" />
-                          {branch.name}
-                          {branch.current && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              {t('Current')}
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {remoteBranches.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                        {t('Remote branches')}
-                      </div>
-                      {remoteBranches.map((branch) => (
-                        <SelectItem key={branch.name} value={branch.name}>
-                          <GitBranch className="mr-2 h-4 w-4" />
-                          {branch.name.replace('remotes/', '')}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectPopup>
-              </Select>
+              <Combobox
+                items={branchGroups}
+                defaultValue={defaultBranchItem}
+                onValueChange={(item: BranchItem | null) => setBaseBranch(item?.value || '')}
+                getOptionLabel={(item: BranchItem) => item.label}
+                getOptionValue={(item: BranchItem) => item.value}
+              >
+                <ComboboxInput
+                  placeholder={t('Search branches...')}
+                  startAddon={<GitBranch className="h-4 w-4" />}
+                  showTrigger
+                />
+                <ComboboxPopup>
+                  <ComboboxEmpty>{t('No branches found')}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(group: BranchGroup) => (
+                      <React.Fragment key={group.value}>
+                        <ComboboxGroup items={group.items}>
+                          <ComboboxGroupLabel>{group.label}</ComboboxGroupLabel>
+                          <ComboboxCollection>
+                            {(item: BranchItem) => (
+                              <ComboboxItem key={item.id} value={item}>
+                                {item.label}
+                              </ComboboxItem>
+                            )}
+                          </ComboboxCollection>
+                        </ComboboxGroup>
+                        {group.value === 'local' && branchGroups.length > 1 && (
+                          <ComboboxSeparator />
+                        )}
+                      </React.Fragment>
+                    )}
+                  </ComboboxList>
+                </ComboboxPopup>
+              </Combobox>
             </Field>
 
             {/* Path Preview */}

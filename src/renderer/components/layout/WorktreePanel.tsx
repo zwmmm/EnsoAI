@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -386,6 +386,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
   const isMain =
     worktree.isMainWorktree || worktree.branch === 'main' || worktree.branch === 'master';
   const branchDisplay = worktree.branch || t('Detached');
@@ -403,9 +404,38 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setMenuPosition({ x: e.clientX, y: e.clientY });
+    const x = e.clientX;
+    const y = e.clientY;
+    // Will adjust position after menu renders
+    setMenuPosition({ x, y });
     setMenuOpen(true);
   };
+
+  // Adjust menu position if it overflows viewport
+  useEffect(() => {
+    if (menuOpen && menuRef.current) {
+      const menu = menuRef.current;
+      const rect = menu.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let { x, y } = menuPosition;
+
+      // Adjust if menu overflows bottom
+      if (y + rect.height > viewportHeight - 8) {
+        y = Math.max(8, viewportHeight - rect.height - 8);
+      }
+
+      // Adjust if menu overflows right
+      if (x + rect.width > viewportWidth - 8) {
+        x = Math.max(8, viewportWidth - rect.width - 8);
+      }
+
+      if (x !== menuPosition.x || y !== menuPosition.y) {
+        setMenuPosition({ x, y });
+      }
+    }
+  }, [menuOpen, menuPosition]);
 
   return (
     <>
@@ -508,6 +538,7 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete, onMerge }: Worktr
             role="presentation"
           />
           <div
+            ref={menuRef}
             className="fixed z-50 min-w-40 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >

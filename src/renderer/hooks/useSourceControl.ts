@@ -1,11 +1,14 @@
+import type { FileChangesResult } from '@shared/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toastManager } from '@/components/ui/toast';
+
+const emptyResult: FileChangesResult = { changes: [] };
 
 export function useFileChanges(workdir: string | null, isActive = true) {
   return useQuery({
     queryKey: ['git', 'file-changes', workdir],
     queryFn: async () => {
-      if (!workdir) return [];
+      if (!workdir) return emptyResult;
       return window.electronAPI.git.getFileChanges(workdir);
     },
     enabled: !!workdir,
