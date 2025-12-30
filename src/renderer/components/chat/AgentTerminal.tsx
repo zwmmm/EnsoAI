@@ -142,14 +142,14 @@ export function AgentTerminal({
     const fullCommand = `${agentCommand} ${agentArgs.join(' ')}`.trim();
     const shellName = resolvedShell.shell.toLowerCase();
 
-    // WSL environment: run through WSL with interactive login shell
+    // WSL environment: run through WSL with user's default shell
     if (environment === 'wsl' && isWindows) {
-      // Use $SHELL -ilc to load nvm/rbenv, add explicit exit to ensure shell exits
-      const wslCommand = `exec $SHELL -ilc "${fullCommand}; exit \\$?"`;
+      // sh -lc loads login profile, exec $SHELL replaces with user's shell (zsh/bash/etc.)
+      const escapedCommand = fullCommand.replace(/"/g, '\\"');
       return {
         command: {
           shell: 'wsl.exe',
-          args: ['--', 'sh', '-c', wslCommand],
+          args: ['--', 'sh', '-lc', `exec "$SHELL" -ilc "${escapedCommand}"`],
         },
         env: envVars,
       };
