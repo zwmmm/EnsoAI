@@ -220,7 +220,7 @@ export function MainContent({
               )}
             </>
           ) : (
-            <Empty>
+            <Empty className="h-full border-0">
               <EmptyMedia variant="icon">
                 <Sparkles className="h-4.5 w-4.5" />
               </EmptyMedia>

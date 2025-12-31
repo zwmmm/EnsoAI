@@ -1,5 +1,6 @@
-import { List, Plus, X } from 'lucide-react';
+import { List, Plus, Terminal, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { matchesKeybinding } from '@/lib/keybinding';
 import { cn } from '@/lib/utils';
@@ -50,25 +51,12 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
   const [editingName, setEditingName] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const initializedCwdsRef = useRef<Set<string>>(new Set());
   const terminalKeybindings = useSettingsStore((state) => state.terminalKeybindings);
   const { setTerminalCount, registerTerminalCloseHandler } = useWorktreeActivityStore();
 
   // Get tabs for current worktree
   const currentTabs = useMemo(() => tabs.filter((t) => t.cwd === cwd), [tabs, cwd]);
   const activeId = cwd ? activeIds[cwd] || null : null;
-
-  // Create initial tab only when terminal panel becomes active for this worktree (lazy loading)
-  useEffect(() => {
-    if (cwd && isActive && !initializedCwdsRef.current.has(cwd)) {
-      initializedCwdsRef.current.add(cwd);
-      const defaultTab: TerminalTab = { id: crypto.randomUUID(), name: 'Untitled-1', cwd };
-      setState((prev) => ({
-        tabs: [...prev.tabs, defaultTab],
-        activeIds: { ...prev.activeIds, [cwd]: defaultTab.id },
-      }));
-    }
-  }, [cwd, isActive]);
 
   // Stable terminal IDs - only append, never reorder (prevents DOM reordering issues with xterm)
   const [terminalIds, setTerminalIds] = useState<string[]>(() => tabs.map((t) => t.id));
@@ -88,15 +76,12 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
 
   // Sync terminal tab counts to worktree activity store
   useEffect(() => {
-    // Group tabs by worktree path and update counts
-    const countsByWorktree = new Map<string, number>();
-    for (const tab of tabs) {
-      countsByWorktree.set(tab.cwd, (countsByWorktree.get(tab.cwd) || 0) + 1);
+    // Always set current worktree count (even if 0)
+    if (cwd) {
+      const count = tabs.filter((t) => t.cwd === cwd).length;
+      setTerminalCount(cwd, count);
     }
-    for (const [worktreePath, count] of countsByWorktree) {
-      setTerminalCount(worktreePath, count);
-    }
-  }, [tabs, setTerminalCount]);
+  }, [tabs, cwd, setTerminalCount]);
 
   // Register close handler for external close requests
   useEffect(() => {
@@ -109,10 +94,6 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
         const newTabs = prev.tabs.filter((t) => t.cwd !== worktreePath);
         const newActiveIds = { ...prev.activeIds };
         delete newActiveIds[worktreePath];
-
-        // Don't create new tab - let user create manually
-        // Remove from initialized set so next visit will create fresh tab
-        initializedCwdsRef.current.delete(worktreePath);
 
         // Explicitly set count to 0
         setTerminalCount(worktreePath, 0);
@@ -150,17 +131,13 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
         const newTabs = prev.tabs.filter((t) => t.id !== id);
         const cwdTabs = newTabs.filter((t) => t.cwd === tabCwd);
 
-        // Always keep at least one tab per worktree
-        if (cwdTabs.length === 0) {
-          const newTab: TerminalTab = { id: crypto.randomUUID(), name: 'Untitled-1', cwd: tabCwd };
-          return {
-            tabs: [...newTabs, newTab],
-            activeIds: { ...prev.activeIds, [tabCwd]: newTab.id },
-          };
-        }
-
         const newActiveIds = { ...prev.activeIds };
-        if (prev.activeIds[tabCwd] === id) {
+
+        // If no more tabs for this worktree, clear active ID
+        if (cwdTabs.length === 0) {
+          delete newActiveIds[tabCwd];
+        } else if (prev.activeIds[tabCwd] === id) {
+          // Switch to adjacent tab
           const oldCwdTabs = prev.tabs.filter((t) => t.cwd === tabCwd);
           const closedIndex = oldCwdTabs.findIndex((t) => t.id === id);
           const newIndex = Math.min(closedIndex, cwdTabs.length - 1);
@@ -359,6 +336,20 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     },
     [draggedId]
   );
+
+  // Empty state when no terminals for current worktree
+  if (currentTabs.length === 0) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-muted-foreground">
+        <Terminal className="h-12 w-12 opacity-50" />
+        <p className="text-sm">{t('No terminals open')}</p>
+        <Button variant="outline" size="sm" onClick={handleNewTab}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t('New Terminal')}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col">

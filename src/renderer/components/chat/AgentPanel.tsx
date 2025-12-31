@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Plus, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n';
 import { matchesKeybinding } from '@/lib/keybinding';
+import { cn } from '@/lib/utils';
 import { useAgentSessionsStore } from '@/stores/agentSessions';
 import { useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 import { BUILTIN_AGENT_IDS, useSettingsStore } from '@/stores/settings';
@@ -92,12 +96,11 @@ function createSession(
 }
 
 export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }: AgentPanelProps) {
-  const { agentSettings, customAgents, agentKeybindings } = useSettingsStore();
+  const { t } = useI18n();
+  const { agentSettings, agentDetectionStatus, customAgents, agentKeybindings, hapiSettings } =
+    useSettingsStore();
   const defaultAgentId = useMemo(() => getDefaultAgentId(agentSettings), [agentSettings]);
   const { setAgentCount, registerAgentCloseHandler } = useWorktreeActivityStore();
-
-  // Track worktrees that have been initialized to prevent StrictMode double-init
-  const initializedWorktreesRef = useRef<Set<string>>(new Set());
 
   // Use zustand store for sessions - state persists even when component unmounts
   const allSessions = useAgentSessionsStore((state) => state.sessions);
@@ -130,52 +133,61 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
   }, [allSessions, repoPath, cwd]);
 
-  // Create initial session when switching to a new repo+worktree
+  // Empty state agent menu
+  const [showAgentMenu, setShowAgentMenu] = useState(false);
+  const [installedAgents, setInstalledAgents] = useState<Set<string>>(new Set());
+
+  // Build installed agents set from persisted detection status
   useEffect(() => {
-    const worktreeKey = `${repoPath}:${cwd}`;
-    if (currentWorktreeSessions.length === 0 && cwd) {
-      // Prevent StrictMode double-init: check ref before checking store
-      if (initializedWorktreesRef.current.has(worktreeKey)) {
-        return;
+    const enabledAgentIds = Object.keys(agentSettings).filter((id) => agentSettings[id]?.enabled);
+    const newInstalled = new Set<string>();
+
+    for (const agentId of enabledAgentIds) {
+      // Handle Hapi agents: check if base CLI is detected as installed
+      if (agentId.endsWith('-hapi')) {
+        if (!hapiSettings.enabled) continue;
+        const baseId = agentId.slice(0, -5);
+        if (agentDetectionStatus[baseId]?.installed) {
+          newInstalled.add(agentId);
+        }
+        continue;
       }
-      // Double check to prevent duplicates
-      const hasSession = allSessions.some((s) => s.repoPath === repoPath && s.cwd === cwd);
-      if (!hasSession) {
-        initializedWorktreesRef.current.add(worktreeKey);
-        const newSession = createSession(
-          repoPath,
-          cwd,
-          defaultAgentId,
-          customAgents,
-          agentSettings
-        );
-        addSession(newSession);
+
+      // Handle Happy agents: check if base CLI is detected as installed
+      if (agentId.endsWith('-happy')) {
+        const baseId = agentId.slice(0, -6);
+        if (agentDetectionStatus[baseId]?.installed) {
+          newInstalled.add(agentId);
+        }
+        continue;
+      }
+
+      // Regular agents: use persisted detection status
+      if (agentDetectionStatus[agentId]?.installed) {
+        newInstalled.add(agentId);
       }
     }
-  }, [
-    repoPath,
-    cwd,
-    currentWorktreeSessions.length,
-    defaultAgentId,
-    customAgents,
-    agentSettings,
-    allSessions,
-    addSession,
-  ]);
+
+    setInstalledAgents(newInstalled);
+  }, [agentSettings, agentDetectionStatus, hapiSettings.enabled]);
+
+  // Filter to only enabled AND installed agents
+  const enabledAgents = useMemo(() => {
+    return Object.keys(agentSettings).filter((id) => {
+      if (!agentSettings[id]?.enabled || !installedAgents.has(id)) return false;
+      if (id.endsWith('-hapi') && !hapiSettings.enabled) return false;
+      return true;
+    });
+  }, [agentSettings, installedAgents, hapiSettings.enabled]);
 
   // Sync initialized agent session counts to worktree activity store
   useEffect(() => {
-    // Group initialized sessions by worktree path and update counts
-    const countsByWorktree = new Map<string, number>();
-    for (const session of allSessions) {
-      if (session.initialized) {
-        countsByWorktree.set(session.cwd, (countsByWorktree.get(session.cwd) || 0) + 1);
-      }
+    // Always set current worktree count (even if 0)
+    if (cwd) {
+      const count = allSessions.filter((s) => s.cwd === cwd && s.initialized).length;
+      setAgentCount(cwd, count);
     }
-    for (const [worktreePath, count] of countsByWorktree) {
-      setAgentCount(worktreePath, count);
-    }
-  }, [allSessions, setAgentCount]);
+  }, [allSessions, cwd, setAgentCount]);
 
   // Register close handler for external close requests
   useEffect(() => {
@@ -186,28 +198,9 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
       );
       if (initializedSessions.length === 0) return;
 
-      // Get the repoPath from the first initialized session
-      const sessionRepoPath = initializedSessions[0].repoPath;
-
       // Remove initialized sessions
       for (const session of initializedSessions) {
         removeSession(session.id);
-      }
-
-      // Check if any sessions remain for this worktree
-      const remainingForWorktree = allSessions.filter(
-        (s) => s.repoPath === sessionRepoPath && s.cwd === worktreePath && !s.initialized
-      );
-      if (remainingForWorktree.length === 0) {
-        // Create a new empty session
-        const newSession = createSession(
-          sessionRepoPath,
-          worktreePath,
-          defaultAgentId,
-          customAgents,
-          agentSettings
-        );
-        addSession(newSession);
       }
 
       // Set count to 0
@@ -215,16 +208,7 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
     };
 
     return registerAgentCloseHandler(handleCloseAll);
-  }, [
-    registerAgentCloseHandler,
-    defaultAgentId,
-    customAgents,
-    agentSettings,
-    setAgentCount,
-    allSessions,
-    removeSession,
-    addSession,
-  ]);
+  }, [registerAgentCloseHandler, setAgentCount, allSessions, removeSession]);
 
   const handleNewSession = useCallback(() => {
     const newSession = createSession(repoPath, cwd, defaultAgentId, customAgents, agentSettings);
@@ -247,37 +231,16 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
         (s) => s.id !== id && s.repoPath === sessionRepoPath && s.cwd === worktreeCwd
       );
 
-      // If closing active session, switch to another
-      if (activeIds[worktreeCwd] === id) {
-        if (remainingInWorktree.length > 0) {
-          const closedIndex = allSessions
-            .filter((s) => s.repoPath === sessionRepoPath && s.cwd === worktreeCwd)
-            .findIndex((s) => s.id === id);
-          const newActiveIndex = Math.min(closedIndex, remainingInWorktree.length - 1);
-          setActiveId(worktreeCwd, remainingInWorktree[newActiveIndex].id);
-        } else {
-          // Create a new session if all closed
-          const newSession = createSession(
-            sessionRepoPath,
-            worktreeCwd,
-            defaultAgentId,
-            customAgents,
-            agentSettings
-          );
-          addSession(newSession);
-        }
+      // If closing active session, switch to another if available
+      if (activeIds[worktreeCwd] === id && remainingInWorktree.length > 0) {
+        const closedIndex = allSessions
+          .filter((s) => s.repoPath === sessionRepoPath && s.cwd === worktreeCwd)
+          .findIndex((s) => s.id === id);
+        const newActiveIndex = Math.min(closedIndex, remainingInWorktree.length - 1);
+        setActiveId(worktreeCwd, remainingInWorktree[newActiveIndex].id);
       }
     },
-    [
-      allSessions,
-      activeIds,
-      defaultAgentId,
-      customAgents,
-      agentSettings,
-      removeSession,
-      setActiveId,
-      addSession,
-    ]
+    [allSessions, activeIds, removeSession, setActiveId]
   );
 
   const handleSelectSession = useCallback(
@@ -466,6 +429,69 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
     cwd,
     handleSelectSession,
   ]);
+
+  // Empty state when no sessions for current worktree
+  if (currentWorktreeSessions.length === 0) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-muted-foreground">
+        <Sparkles className="h-12 w-12 opacity-50" />
+        <p className="text-sm">{t('No agent sessions')}</p>
+        <div
+          className="relative"
+          onMouseEnter={() => setShowAgentMenu(true)}
+          onMouseLeave={() => setShowAgentMenu(false)}
+        >
+          <Button variant="outline" size="sm" onClick={handleNewSession}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('New Session')}
+          </Button>
+          {showAgentMenu && enabledAgents.length > 0 && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-50 min-w-40">
+              <div className="rounded-lg border bg-popover p-1 shadow-lg">
+                <div className="px-2 py-1 text-xs text-muted-foreground">{t('Select Agent')}</div>
+                {enabledAgents.map((agentId) => {
+                  const isHapi = agentId.endsWith('-hapi');
+                  const isHappy = agentId.endsWith('-happy');
+                  const baseId = isHapi
+                    ? agentId.slice(0, -5)
+                    : isHappy
+                      ? agentId.slice(0, -6)
+                      : agentId;
+                  const customAgent = customAgents.find((a) => a.id === baseId);
+                  const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
+                  const name = isHapi
+                    ? `${baseName} (Hapi)`
+                    : isHappy
+                      ? `${baseName} (Happy)`
+                      : baseName;
+                  const isDefault = agentSettings[agentId]?.isDefault;
+                  return (
+                    <button
+                      type="button"
+                      key={agentId}
+                      onClick={() => {
+                        handleNewSessionWithAgent(
+                          agentId,
+                          customAgent?.command ?? AGENT_INFO[baseId]?.command ?? 'claude'
+                        );
+                        setShowAgentMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <span>{name}</span>
+                      {isDefault && (
+                        <span className="text-xs text-muted-foreground">{t('(default)')}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full">
