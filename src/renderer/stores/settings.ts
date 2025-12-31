@@ -662,9 +662,16 @@ export const useSettingsStore = create<SettingsState>()(
       // Deep merge nested objects to preserve new default fields when upgrading
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<SettingsState>;
+
+        // Migrate legacy 'canvas' renderer to 'webgl' (canvas support was removed)
+        const terminalRenderer =
+          persisted.terminalRenderer === 'canvas' ? 'webgl' : persisted.terminalRenderer;
+
         return {
           ...currentState,
           ...persisted,
+          // Override with migrated value
+          ...(terminalRenderer && { terminalRenderer }),
           // Deep merge keybindings to ensure new fields get default values
           terminalKeybindings: {
             ...currentState.terminalKeybindings,

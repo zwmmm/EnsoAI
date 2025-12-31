@@ -391,30 +391,26 @@ export function useXterm({
         return false;
       }
 
-      // Windows/Linux: Ctrl+C to copy (when text is selected), Ctrl+V to paste
-      // On macOS, Cmd+C/V is handled by the browser natively
+      // Handle copy - paste is NOT intercepted to allow image paste in agents
       const platform = window.electronAPI.env.platform;
-      if (platform !== 'darwin' && event.type === 'keydown' && event.ctrlKey && !event.altKey) {
-        // Ctrl+Shift+C: Always send SIGINT (for users who need to interrupt even with selection)
-        // Ctrl+C: Copy if has selection, otherwise let terminal handle (SIGINT)
+      const isMac = platform === 'darwin';
+      const modKey = isMac ? event.metaKey : event.ctrlKey;
+
+      if (event.type === 'keydown' && modKey && !event.altKey) {
+        // Paste: DO NOT intercept - let browser/agent handle it naturally
+        // This allows Claude Code and other agents to receive image paste events
+        if (event.key === 'v' || event.key === 'V') {
+          return false; // Let event bubble up
+        }
+
+        // Copy: Cmd+C (mac) or Ctrl+C (win/linux)
         if (event.key === 'c' || event.key === 'C') {
-          if (!event.shiftKey && terminal.hasSelection()) {
+          if (terminal.hasSelection()) {
             navigator.clipboard.writeText(terminal.getSelection());
             return false;
           }
-          // Let Ctrl+C pass through to terminal as SIGINT when no selection
-        }
-        // Ctrl+V or Ctrl+Shift+V: Paste from clipboard
-        if (event.key === 'v' || event.key === 'V') {
-          event.preventDefault();
-          navigator.clipboard
-            .readText()
-            .then((text) => {
-              terminal.paste(text);
-            })
-            .catch(() => {
-              // Clipboard access denied or empty, ignore silently
-            });
+          // On Windows/Linux, let Ctrl+C pass through as SIGINT when no selection
+          if (!isMac) return true;
           return false;
         }
       }
