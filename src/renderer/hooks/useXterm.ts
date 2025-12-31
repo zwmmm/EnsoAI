@@ -229,20 +229,6 @@ export function useXterm({
         });
         terminal.loadAddon(webglAddon);
         rendererAddonRef.current = webglAddon;
-
-        // Fix for WebGL ghosting/corruption: clear texture atlas on resize
-        // This helps when the texture atlas gets fragmented over time
-        terminal.onResize(() => {
-          try {
-            // Use ref to support hot-swapping: only clear if current renderer is WebGL
-            const currentAddon = rendererAddonRef.current;
-            if (currentAddon && 'clearTextureAtlas' in currentAddon) {
-              (currentAddon as WebglAddon).clearTextureAtlas();
-            }
-          } catch {
-            // Ignore errors if addon is disposed
-          }
-        });
       } catch (error) {
         console.warn('[xterm] WebGL failed, falling back to canvas:', error);
         try {
@@ -285,7 +271,7 @@ export function useXterm({
       scrollback: settings.scrollback,
       allowProposedApi: true,
       allowTransparency: false,
-      rescaleOverlappingGlyphs: false,
+      rescaleOverlappingGlyphs: true,
     });
 
     const fitAddon = new FitAddon();
