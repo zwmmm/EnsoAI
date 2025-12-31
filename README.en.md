@@ -338,7 +338,7 @@ Recommended workflow:
 <details>
 <summary><strong>Terminal display issues/artifacts?</strong></summary>
 
-Go to Settings → Terminal → Switch renderer from WebGL to Canvas.
+Go to Settings → Terminal → Switch renderer from WebGL to DOM.
 
 </details>
 

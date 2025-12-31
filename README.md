@@ -337,7 +337,7 @@ EnsoAI 专注于 **Git Worktree + AI Agent** 的协作场景。它不是要替�
 <details>
 <summary><strong>终端显示异常/花屏？</strong></summary>
 
-进入设置 → 终端 → 将渲染器从 WebGL 切换为 Canvas。
+进入设置 → 终端 → 将渲染器从 WebGL 切换为 DOM。
 
 </details>
 

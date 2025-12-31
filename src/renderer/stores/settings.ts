@@ -90,7 +90,7 @@ export type FontWeight =
   | '800'
   | '900';
 
-export type TerminalRenderer = 'dom' | 'canvas' | 'webgl';
+export type TerminalRenderer = 'dom' | 'webgl';
 
 export interface AgentConfig {
   enabled: boolean;
@@ -470,7 +470,7 @@ export const useSettingsStore = create<SettingsState>()(
       terminalFontWeight: 'normal',
       terminalFontWeightBold: '500',
       terminalTheme: 'Dracula',
-      terminalRenderer: 'canvas',
+      terminalRenderer: 'webgl',
       terminalScrollback: 10000,
       terminalKeybindings: defaultTerminalKeybindings,
       mainTabKeybindings: defaultMainTabKeybindings,
