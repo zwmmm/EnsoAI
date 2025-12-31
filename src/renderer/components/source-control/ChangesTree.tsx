@@ -28,8 +28,8 @@ interface ChangesTreeProps {
   onFileClick: (file: { path: string; staged: boolean }) => void;
   onStage: (paths: string[]) => void;
   onUnstage: (paths: string[]) => void;
-  onDiscard: (path: string) => void;
-  onDeleteUntracked?: (path: string) => void;
+  onDiscard: (paths: string[]) => void;
+  onDeleteUntracked?: (paths: string[]) => void;
 }
 
 // M=Modified, A=Added, D=Deleted, R=Renamed, C=Copied, U=Untracked, X=Conflict
@@ -122,10 +122,21 @@ interface FileTreeNodeProps {
   staged: boolean;
   selectedFile: { path: string; staged: boolean } | null;
   onFileClick: (file: { path: string; staged: boolean }) => void;
-  onAction: (path: string) => void;
+  onAction: (paths: string[]) => void;
   actionIcon: React.ElementType;
   actionTitle: string;
-  onDiscard?: (path: string) => void;
+  onDiscard?: (paths: string[]) => void;
+}
+
+// 收集文件夹下所有文件路径
+function collectFilePaths(node: TreeNode): string[] {
+  if (node.type === 'file' && node.file) {
+    return [node.file.path];
+  }
+  if (node.children) {
+    return node.children.flatMap(collectFilePaths);
+  }
+  return [];
 }
 
 function FileTreeNode({
@@ -145,6 +156,8 @@ function FileTreeNode({
 
   if (node.type === 'folder') {
     const Icon = isExpanded ? FolderOpen : Folder;
+    const folderPaths = collectFilePaths(node);
+
     return (
       <>
         <div
@@ -164,6 +177,34 @@ function FileTreeNode({
           <span className="min-w-0 flex-1 truncate text-muted-foreground" title={node.path}>
             {node.name}
           </span>
+
+          {/* Folder action buttons */}
+          <div className="hidden shrink-0 items-center group-hover:flex">
+            {onDiscard && (
+              <button
+                type="button"
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDiscard(folderPaths);
+                }}
+                title={t('Discard changes')}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(folderPaths);
+              }}
+              title={actionTitle}
+            >
+              <ActionIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         {isExpanded &&
@@ -223,7 +264,7 @@ function FileTreeNode({
             className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              onDiscard(file.path);
+              onDiscard([file.path]);
             }}
             title={t('Discard changes')}
           >
@@ -235,7 +276,7 @@ function FileTreeNode({
           className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
           onClick={(e) => {
             e.stopPropagation();
-            onAction(file.path);
+            onAction([file.path]);
           }}
           title={actionTitle}
         >
@@ -336,7 +377,7 @@ export function ChangesTree({
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-4 p-3">
+      <div className="space-y-4 py-2">
         {/* Collapse/Expand All Button */}
         {allFolderPaths.size > 0 && (
           <div className="flex justify-end px-2">
@@ -385,7 +426,7 @@ export function ChangesTree({
                   staged={true}
                   selectedFile={selectedFile}
                   onFileClick={onFileClick}
-                  onAction={(path) => onUnstage([path])}
+                  onAction={onUnstage}
                   actionIcon={Minus}
                   actionTitle={t('Unstage')}
                 />
@@ -418,7 +459,7 @@ export function ChangesTree({
                   staged={false}
                   selectedFile={selectedFile}
                   onFileClick={onFileClick}
-                  onAction={(path) => onStage([path])}
+                  onAction={onStage}
                   actionIcon={Plus}
                   actionTitle={t('Stage')}
                   onDiscard={onDiscard}
@@ -452,7 +493,7 @@ export function ChangesTree({
                   staged={false}
                   selectedFile={selectedFile}
                   onFileClick={onFileClick}
-                  onAction={(path) => onStage([path])}
+                  onAction={onStage}
                   actionIcon={Plus}
                   actionTitle={t('Stage')}
                   onDiscard={onDeleteUntracked}

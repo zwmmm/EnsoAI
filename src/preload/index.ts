@@ -69,8 +69,8 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_STAGE, workdir, paths),
     unstage: (workdir: string, paths: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_UNSTAGE, workdir, paths),
-    discard: (workdir: string, filePath: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_DISCARD, workdir, filePath),
+    discard: (workdir: string, paths: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_DISCARD, workdir, paths),
     showCommit: (workdir: string, hash: string): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_COMMIT_SHOW, workdir, hash),
     getCommitFiles: (workdir: string, hash: string): Promise<CommitFileChange[]> =>

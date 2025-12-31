@@ -534,32 +534,52 @@ export function SourceControlPanel({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmAction?.type === 'discard' ? t('Discard changes') : t('Delete file')}
+              {confirmAction?.type === 'discard'
+                ? confirmAction.paths.length > 1
+                  ? t('Discard {{count}} changes', { count: confirmAction.paths.length })
+                  : t('Discard changes')
+                : confirmAction?.paths.length > 1
+                  ? t('Delete {{count}} files', { count: confirmAction.paths.length })
+                  : t('Delete file')}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmAction?.type === 'discard'
-                ? tNode(
-                    'Are you sure you want to discard changes to {{path}}? This cannot be undone.',
-                    {
-                      path: (
-                        <span className="font-medium text-foreground">{confirmAction.path}</span>
-                      ),
-                    }
-                  )
-                : tNode(
-                    'Are you sure you want to delete the untracked file {{path}}? This cannot be undone.',
-                    {
-                      path: (
-                        <span className="font-medium text-foreground">{confirmAction?.path}</span>
-                      ),
-                    }
-                  )}
+              {confirmAction?.paths.length === 1
+                ? confirmAction?.type === 'discard'
+                  ? tNode(
+                      'Are you sure you want to discard changes to {{path}}? This cannot be undone.',
+                      {
+                        path: (
+                          <span className="font-medium text-foreground break-all">
+                            {confirmAction.paths[0]}
+                          </span>
+                        ),
+                      }
+                    )
+                  : tNode(
+                      'Are you sure you want to delete the untracked file {{path}}? This cannot be undone.',
+                      {
+                        path: (
+                          <span className="font-medium text-foreground break-all">
+                            {confirmAction?.paths[0]}
+                          </span>
+                        ),
+                      }
+                    )
+                : confirmAction?.type === 'discard'
+                  ? t(
+                      'Are you sure you want to discard changes to {{count}} files? This cannot be undone.',
+                      { count: confirmAction.paths.length }
+                    )
+                  : t(
+                      'Are you sure you want to delete {{count}} untracked files? This cannot be undone.',
+                      { count: confirmAction?.paths.length }
+                    )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose render={<Button variant="outline">{t('Cancel')}</Button>} />
             <Button variant="destructive" onClick={handleConfirmAction}>
-              {confirmAction?.type === 'discard' ? t('Discard changes') : t('Delete file')}
+              {confirmAction?.type === 'discard' ? t('Discard') : t('Delete')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

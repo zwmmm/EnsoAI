@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n';
 import { useSourceControlStore } from '@/stores/sourceControl';
 
 export interface ConfirmAction {
-  path: string;
+  paths: string[];
   type: 'discard' | 'delete';
 }
 
@@ -42,12 +42,12 @@ export function useSourceControlActions({ rootPath, stagedCount }: UseSourceCont
     [rootPath, unstageMutation]
   );
 
-  const handleDiscard = useCallback((path: string) => {
-    setConfirmAction({ path, type: 'discard' });
+  const handleDiscard = useCallback((paths: string[]) => {
+    setConfirmAction({ paths, type: 'discard' });
   }, []);
 
-  const handleDeleteUntracked = useCallback((path: string) => {
-    setConfirmAction({ path, type: 'delete' });
+  const handleDeleteUntracked = useCallback((paths: string[]) => {
+    setConfirmAction({ paths, type: 'delete' });
   }, []);
 
   const handleConfirmAction = useCallback(async () => {
@@ -55,18 +55,21 @@ export function useSourceControlActions({ rootPath, stagedCount }: UseSourceCont
 
     try {
       if (confirmAction.type === 'discard') {
-        discardMutation.mutate({ workdir: rootPath, path: confirmAction.path });
+        // 批量 discard，一次 git 调用避免锁冲突
+        await discardMutation.mutateAsync({ workdir: rootPath, paths: confirmAction.paths });
       } else {
-        // Delete untracked file
-        await window.electronAPI.file.delete(`${rootPath}/${confirmAction.path}`, {
-          recursive: false,
-        });
+        // Delete untracked files
+        for (const path of confirmAction.paths) {
+          await window.electronAPI.file.delete(`${rootPath}/${path}`, {
+            recursive: false,
+          });
+        }
         // Invalidate queries to refresh the file list
         stageMutation.mutate({ workdir: rootPath, paths: [] });
       }
 
       // Clear selection if affecting selected file
-      if (selectedFile?.path === confirmAction.path) {
+      if (selectedFile && confirmAction.paths.includes(selectedFile.path)) {
         setSelectedFile(null);
       }
     } catch (error) {

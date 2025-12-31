@@ -285,30 +285,45 @@ export class GitService {
     await this.git.raw(['reset', 'HEAD', '--', ...paths]);
   }
 
-  async discard(filePath: string): Promise<void> {
-    // 1. First check for symbolic links on the original path (before resolving)
-    const initialPath = path.join(this.workdir, filePath);
-    const initialStats = await fs.lstat(initialPath).catch(() => null);
-    if (initialStats?.isSymbolicLink()) {
-      throw new Error('Cannot discard symbolic links');
-    }
+  async discard(filePaths: string | string[]): Promise<void> {
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    const trackedPaths: string[] = [];
+    const untrackedPaths: string[] = [];
 
-    // 2. Then validate path to prevent path traversal attacks
-    const absolutePath = path.resolve(this.workdir, filePath);
-    const relativePath = path.relative(this.workdir, absolutePath);
-
-    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      throw new Error('Invalid file path: path traversal detected');
-    }
-
-    // 3. Check if file is untracked and perform discard
     const status = await this.git.status();
-    if (status.not_added.includes(filePath)) {
-      // Delete untracked file
+
+    for (const filePath of paths) {
+      // 1. First check for symbolic links on the original path (before resolving)
+      const initialPath = path.join(this.workdir, filePath);
+      const initialStats = await fs.lstat(initialPath).catch(() => null);
+      if (initialStats?.isSymbolicLink()) {
+        throw new Error(`Cannot discard symbolic links: ${filePath}`);
+      }
+
+      // 2. Then validate path to prevent path traversal attacks
+      const absolutePath = path.resolve(this.workdir, filePath);
+      const relativePath = path.relative(this.workdir, absolutePath);
+
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        throw new Error(`Invalid file path: path traversal detected - ${filePath}`);
+      }
+
+      // 3. Categorize files
+      if (status.not_added.includes(filePath)) {
+        untrackedPaths.push(absolutePath);
+      } else {
+        trackedPaths.push(filePath);
+      }
+    }
+
+    // Delete untracked files
+    for (const absolutePath of untrackedPaths) {
       await fs.unlink(absolutePath);
-    } else {
-      // Restore tracked file
-      await this.git.checkout(['--', filePath]);
+    }
+
+    // Restore tracked files in one git command
+    if (trackedPaths.length > 0) {
+      await this.git.checkout(['--', ...trackedPaths]);
     }
   }
 

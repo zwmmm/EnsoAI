@@ -161,9 +161,9 @@ export function registerGitHandlers(): void {
     await git.unstage(paths);
   });
 
-  ipcMain.handle(IPC_CHANNELS.GIT_DISCARD, async (_, workdir: string, filePath: string) => {
+  ipcMain.handle(IPC_CHANNELS.GIT_DISCARD, async (_, workdir: string, paths: string[]) => {
     const git = getGitService(workdir);
-    await git.discard(filePath);
+    await git.discard(paths);
   });
 
   ipcMain.handle(IPC_CHANNELS.GIT_COMMIT_SHOW, async (_, workdir: string, hash: string) => {

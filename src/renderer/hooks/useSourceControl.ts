@@ -88,8 +88,8 @@ export function useGitDiscard() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ workdir, path }: { workdir: string; path: string }) => {
-      await window.electronAPI.git.discard(workdir, path);
+    mutationFn: async ({ workdir, paths }: { workdir: string; paths: string[] }) => {
+      await window.electronAPI.git.discard(workdir, paths);
     },
     onSuccess: async (_, { workdir }) => {
       await Promise.all([
