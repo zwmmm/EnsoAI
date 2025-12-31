@@ -347,6 +347,7 @@ export const zhTranslations: Record<string, string> = {
   'Click the button in the top right to create your first worktree':
     '点击右上角按钮创建第一个 Worktree',
   'Close Agent Sessions': '关闭 Agent 会话',
+  'Close All Sessions': '关闭所有会话',
   'Close Terminal Sessions': '关闭终端会话',
   'Confirm exit': '确认退出',
   'Create your first worktree to get started': '创建第一个 Worktree 开始工作',

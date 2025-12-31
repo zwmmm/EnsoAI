@@ -673,6 +673,22 @@ function WorktreeItem({
             className="fixed z-50 min-w-40 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >
+            {/* Close All Sessions */}
+            {activity.agentCount > 0 && activity.terminalCount > 0 && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
+                onClick={() => {
+                  setMenuOpen(false);
+                  closeAgentSessions(worktree.path);
+                  closeTerminalSessions(worktree.path);
+                }}
+              >
+                <X className="h-4 w-4" />
+                {t('Close All Sessions')}
+              </button>
+            )}
+
             {/* Close Agent Sessions */}
             {activity.agentCount > 0 && (
               <button

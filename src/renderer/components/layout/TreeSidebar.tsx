@@ -905,9 +905,12 @@ function WorktreeTreeItem({
                   : 'text-muted-foreground'
             )}
           />
-          <span className={cn('min-w-0 flex-1 truncate', isPrunable && 'line-through')}>
-            {branchDisplay}
-          </span>
+          <div className="min-w-0 flex-1 flex flex-col">
+            <span className={cn('truncate', isPrunable && 'line-through')}>{branchDisplay}</span>
+            <span className="truncate text-[10px] text-muted-foreground">
+              {worktree.path.split(/[\\/]/).pop()}
+            </span>
+          </div>
           {isPrunable ? (
             <span className="shrink-0 rounded bg-destructive/20 px-1 py-0.5 text-[9px] font-medium uppercase text-destructive">
               {t('Deleted')}
@@ -971,6 +974,22 @@ function WorktreeTreeItem({
             className="fixed z-50 min-w-40 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >
+            {/* Close All Sessions */}
+            {activity.agentCount > 0 && activity.terminalCount > 0 && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent/50"
+                onClick={() => {
+                  setMenuOpen(false);
+                  closeAgentSessions(worktree.path);
+                  closeTerminalSessions(worktree.path);
+                }}
+              >
+                <X className="h-4 w-4" />
+                {t('Close All Sessions')}
+              </button>
+            )}
+
             {/* Close Agent Sessions */}
             {activity.agentCount > 0 && (
               <button
