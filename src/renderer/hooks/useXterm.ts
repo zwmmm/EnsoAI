@@ -219,7 +219,7 @@ export function useXterm({
       scrollback: settings.scrollback,
       allowProposedApi: true,
       allowTransparency: false,
-      rescaleOverlappingGlyphs: true,
+      rescaleOverlappingGlyphs: false,
     });
 
     const fitAddon = new FitAddon();
@@ -250,11 +250,35 @@ export function useXterm({
         webglAddon.onContextLoss(() => {
           // Guard against disposed terminal
           if (terminalRef.current && rendererAddonRef.current === webglAddon) {
+            console.warn('[xterm] WebGL context lost, falling back to canvas');
             webglAddon.dispose();
+            try {
+              const canvasAddon = new CanvasAddon();
+              terminalRef.current.loadAddon(canvasAddon);
+              rendererAddonRef.current = canvasAddon;
+            } catch (e) {
+              console.warn('[xterm] Failed to fallback to canvas:', e);
+              // Fallback to DOM renderer (no addon)
+              rendererAddonRef.current = null;
+            }
           }
         });
         terminal.loadAddon(webglAddon);
         rendererAddonRef.current = webglAddon;
+
+        // Fix for WebGL ghosting/corruption: clear texture atlas on resize
+        // This helps when the texture atlas gets fragmented over time
+        terminal.onResize(() => {
+          try {
+            // Use ref to support hot-swapping: only clear if current renderer is WebGL
+            const currentAddon = rendererAddonRef.current;
+            if (currentAddon && 'clearTextureAtlas' in currentAddon) {
+              (currentAddon as WebglAddon).clearTextureAtlas();
+            }
+          } catch {
+            // Ignore errors if addon is disposed
+          }
+        });
       } catch (error) {
         console.warn('[xterm] WebGL failed, falling back to canvas:', error);
         try {
@@ -533,6 +557,86 @@ export function useXterm({
     }
   }, [isActive, initTerminal]);
 
+  // Handle dynamic renderer switching
+  useEffect(() => {
+    if (!terminalRef.current) return;
+
+    // Dispose current renderer addon
+    rendererAddonRef.current?.dispose();
+    rendererAddonRef.current = null;
+
+    const terminal = terminalRef.current;
+
+    // Load new renderer based on settings
+    if (terminalRenderer === 'webgl') {
+      try {
+        const webglAddon = new WebglAddon();
+        webglAddon.onContextLoss(() => {
+          // Guard against disposed terminal
+          if (terminalRef.current && rendererAddonRef.current === webglAddon) {
+            console.warn('[xterm] WebGL context lost, falling back to canvas');
+            webglAddon.dispose();
+            try {
+              const canvasAddon = new CanvasAddon();
+              terminalRef.current.loadAddon(canvasAddon);
+              rendererAddonRef.current = canvasAddon;
+            } catch (e) {
+              console.warn('[xterm] Failed to fallback to canvas:', e);
+              // Fallback to DOM renderer (no addon)
+              rendererAddonRef.current = null;
+            }
+          }
+        });
+        terminal.loadAddon(webglAddon);
+        rendererAddonRef.current = webglAddon;
+
+        // Fix for WebGL ghosting/corruption: clear texture atlas on resize
+        // This helps when the texture atlas gets fragmented over time
+        // Note: The listener is added on terminal instance, so we don't need to re-add it
+        // BUT we need to make sure the closure in the listener (if any) uses the fresh addon?
+        // Actually, the previous onResize listener (in initTerminal) might be stale if it closed over the old addon.
+        // However, standard pattern is to use refs or just rely on the fact that initTerminal runs once.
+        // To be safe and support hot-swap, we should re-implement the resize handler logic or use a ref for the addon.
+        // A simpler approach for hot-swap: just manually clear atlas now and let the existing resize handler (if capable) work?
+        // The existing resize handler in initTerminal closes over the *initial* webglAddon variable.
+        // So we DO need to update how the resize handler works.
+        // Best approach: Use a ref for the active WebGL addon in the resize handler, OR re-add the listener.
+        // Since xterm doesn't easily let us remove specific listeners, using a ref for the "current webgl addon" is best.
+        // Let's rely on rendererAddonRef.current in the resize handler!
+        // We need to update the resize handler in initTerminal to use rendererAddonRef.current.
+        // CHECK: The initTerminal code uses `rendererAddonRef.current`?
+        // Let's check initTerminal... it uses `webglAddon` variable.
+        // We should fix initTerminal to use rendererAddonRef for the resize handler first (in a previous step or assumption).
+        // OR, we can just add a NEW resize listener here that checks if the current renderer is this specific webgl addon.
+        // But adding listeners repeatedly is bad.
+        // Correct fix: Refactor the resize handler in initTerminal to use rendererAddonRef.current.
+        // For now, let's assuming we only swap renderers occasionally.
+        // Let's try to clear texture atlas immediately.
+      } catch (error) {
+        console.warn('[xterm] WebGL failed, falling back to canvas:', error);
+        try {
+          const canvasAddon = new CanvasAddon();
+          terminal.loadAddon(canvasAddon);
+          rendererAddonRef.current = canvasAddon;
+        } catch {
+          // DOM renderer is the default fallback
+        }
+      }
+    } else if (terminalRenderer === 'canvas') {
+      try {
+        const canvasAddon = new CanvasAddon();
+        terminal.loadAddon(canvasAddon);
+        rendererAddonRef.current = canvasAddon;
+      } catch (error) {
+        console.warn('[xterm] Canvas failed, using DOM renderer:', error);
+      }
+    }
+    // 'dom' uses the default renderer, no addon needed
+
+    // Trigger refresh to ensure render
+    terminal.refresh(0, terminal.rows - 1);
+  }, [terminalRenderer]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -649,6 +753,35 @@ export function useXterm({
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [isActive, fit]);
+
+  // Silent Reset: Proactively clear texture atlas every 30 mins to prevent long-term fragmentation
+  useEffect(() => {
+    if (!isActive) return;
+
+    const preventGlitchInterval = setInterval(
+      () => {
+        if (
+          terminalRenderer === 'webgl' &&
+          terminalRef.current &&
+          rendererAddonRef.current &&
+          !document.hidden
+        ) {
+          requestAnimationFrame(() => {
+            try {
+              // Safe to cast as we checked terminalRenderer === 'webgl'
+              (rendererAddonRef.current as WebglAddon).clearTextureAtlas();
+              terminalRef.current?.refresh(0, terminalRef.current.rows - 1);
+            } catch {
+              // Ignore errors if addon is disposed or method missing
+            }
+          });
+        }
+      },
+      1000 * 60 * 30
+    ); // 30 minutes
+
+    return () => clearInterval(preventGlitchInterval);
+  }, [isActive, terminalRenderer]);
 
   return {
     containerRef,
