@@ -73,7 +73,7 @@ export function SettingsDialog({ trigger, open, onOpenChange }: SettingsDialogPr
         <div className="flex items-center justify-between border-b px-4 py-3">
           <DialogTitle className="text-lg font-medium">{t('Settings')}</DialogTitle>
         </div>
-        <div className="flex h-[600px]">
+        <div className="flex min-h-0 max-h-[600px] flex-1">
           {/* Left: Category List */}
           <nav className="w-48 shrink-0 space-y-1 border-r p-2">
             {categories.map((category) => (

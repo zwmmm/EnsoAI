@@ -58,7 +58,7 @@ function SelectPopup({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
         alignItemWithTrigger={alignItemWithTrigger}
-        className="z-50 select-none"
+        className="z-[55] select-none"
         data-slot="select-positioner"
         sideOffset={sideOffset}
       >

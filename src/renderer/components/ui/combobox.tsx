@@ -134,7 +134,7 @@ function ComboboxPopup({
     <ComboboxPrimitive.Portal>
       <ComboboxPrimitive.Positioner
         anchor={chipsRef}
-        className="z-50 select-none"
+        className="z-[55] select-none"
         data-slot="combobox-positioner"
         sideOffset={sideOffset}
       >

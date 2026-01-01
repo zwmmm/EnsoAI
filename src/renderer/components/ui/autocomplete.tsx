@@ -84,7 +84,7 @@ function AutocompletePopup({
   return (
     <AutocompletePrimitive.Portal>
       <AutocompletePrimitive.Positioner
-        className="z-50 select-none"
+        className="z-[55] select-none"
         data-slot="autocomplete-positioner"
         sideOffset={sideOffset}
       >
