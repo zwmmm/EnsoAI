@@ -12,6 +12,97 @@ const isWindows = process.platform === 'win32';
 // Cache for Windows registry PATH (read once)
 let cachedWindowsPath: string | null = null;
 
+// Cache for Windows registry environment variables
+let cachedRegistryEnvVars: Record<string, string> | null = null;
+
+/**
+ * Clear cached PATH and environment variables (useful for debugging or after env changes)
+ */
+export function clearPathCache(): void {
+  cachedWindowsPath = null;
+  cachedRegistryEnvVars = null;
+  console.log('[PtyManager] PATH cache cleared');
+}
+
+/**
+ * Read environment variables from Windows registry (user + system level)
+ * This is needed because GUI apps don't inherit shell environment variables
+ */
+function getWindowsRegistryEnvVars(): Record<string, string> {
+  if (cachedRegistryEnvVars !== null) {
+    return cachedRegistryEnvVars;
+  }
+
+  const envVars: Record<string, string> = {};
+
+  // Parse registry output line by line
+  // Format: "    VAR_NAME    REG_SZ    value" or with tabs
+  const parseRegistryOutput = (output: string): void => {
+    const lines = output.split(/\r?\n/);
+    for (const line of lines) {
+      // Match: whitespace, name, whitespace, REG_SZ or REG_EXPAND_SZ, whitespace, value
+      // Use flexible whitespace matching (\s+) and capture the rest as value
+      const match = line.match(/^\s+(\S+)\s+REG_(EXPAND_)?SZ\s+(.*)$/i);
+      if (match) {
+        const name = match[1];
+        const value = match[3].trim();
+        if (name && value && !envVars[name]) {
+          envVars[name] = value;
+        }
+      }
+    }
+  };
+
+  try {
+    // Read user-level environment variables
+    try {
+      const userOutput = execSync('reg query "HKCU\\Environment" 2>nul', {
+        encoding: 'utf8',
+        timeout: 3000,
+      });
+      parseRegistryOutput(userOutput);
+    } catch {
+      // User registry query failed
+    }
+
+    // Read system-level environment variables
+    try {
+      const systemOutput = execSync(
+        'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" 2>nul',
+        { encoding: 'utf8', timeout: 3000 }
+      );
+      parseRegistryOutput(systemOutput);
+    } catch {
+      // System registry query failed
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  cachedRegistryEnvVars = envVars;
+  return envVars;
+}
+
+/**
+ * Expand Windows environment variables in a string (e.g., %PATH% -> actual value)
+ * Reads variable values from registry (GUI apps don't inherit shell environment)
+ */
+function expandWindowsEnvVars(str: string): string {
+  const registryEnvVars = getWindowsRegistryEnvVars();
+
+  // Replace %VAR% patterns with their values from registry
+  return str.replace(/%([^%]+)%/g, (match, varName) => {
+    const upperVarName = varName.toUpperCase();
+    for (const [key, value] of Object.entries(registryEnvVars)) {
+      if (key.toUpperCase() === upperVarName) {
+        return value;
+      }
+    }
+    // Keep original if not found
+    return match;
+  });
+}
+
 /**
  * Read full PATH from Windows registry (user + system level)
  * This ensures GUI apps get the same PATH as terminal apps
@@ -49,7 +140,11 @@ function getWindowsRegistryPath(): string {
     }
 
     // Combine: system PATH first, then user PATH (Windows convention)
-    const combinedPath = [systemPath, userPath].filter(Boolean).join(delimiter);
+    let combinedPath = [systemPath, userPath].filter(Boolean).join(delimiter);
+
+    // Expand environment variables like %NVM_SYMLINK%, %USERPROFILE%, etc.
+    combinedPath = expandWindowsEnvVars(combinedPath);
+
     cachedWindowsPath = combinedPath || process.env.PATH || '';
     return cachedWindowsPath;
   } catch {

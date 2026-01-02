@@ -6,7 +6,6 @@ import { promisify } from 'node:util';
 import { getEnvForCommand, getShellForCommand } from '../../utils/shell';
 
 const execAsync = promisify(exec);
-const _isWindows = process.platform === 'win32';
 
 export interface HapiConfig {
   webappPort: number;
@@ -114,7 +113,8 @@ class HapiServerManager extends EventEmitter {
 
   /**
    * Check if happy is globally installed (cached)
-   * Uses 'which happy' for fast detection, then gets version separately
+   * Uses npm to check if happy-coder package is installed globally.
+   * This is more reliable than running 'happy --version' which may start child processes.
    */
   async checkHappyGlobalInstall(forceRefresh = false): Promise<HappyGlobalStatus> {
     // Return cached result if still valid
@@ -127,28 +127,44 @@ class HapiServerManager extends EventEmitter {
     }
 
     try {
-      // Directly execute 'happy --version' like CliDetector does for agent detection
-      // This avoids compatibility issues with Get-Command/where.exe/which
-      const stdout = await this.execInLoginShell('happy --version', 30000);
-      // Match version from first line: "happy version: X.Y.Z"
-      const match = stdout.match(/happy version:\s*(\d+\.\d+\.\d+)/i);
-      this.happyGlobalStatus = {
-        installed: true,
-        version: match ? match[1] : undefined,
-      };
+      // Use npm list to check if happy-coder is installed globally
+      // This is more reliable than running 'happy --version' which may hang
+      // Run npm directly with enhanced PATH to ensure it's found
+      const { stdout } = await execAsync('npm list -g happy-coder --depth=0 --json', {
+        timeout: 15000,
+        env: getEnvForCommand(),
+      });
+
+      // Parse npm output to get version
+      // Format: {"dependencies":{"happy-coder":{"version":"0.13.0",...}}}
+      const npmOutput = JSON.parse(stdout);
+      const happyInfo = npmOutput?.dependencies?.['happy-coder'];
+
+      if (happyInfo) {
+        this.happyGlobalStatus = {
+          installed: true,
+          version: happyInfo.version,
+        };
+      } else {
+        this.happyGlobalStatus = { installed: false };
+      }
     } catch (error: unknown) {
-      // PowerShell profile may have non-fatal errors (e.g., Set-PSReadLineOption in non-TTY)
-      // Check if stdout contains version info despite the error
+      // npm list returns exit code 1 if package not found, check stdout anyway
       const execError = error as { stdout?: string };
       if (execError.stdout) {
-        const match = execError.stdout.match(/happy version:\s*(\d+\.\d+\.\d+)/i);
-        if (match) {
-          this.happyGlobalStatus = {
-            installed: true,
-            version: match[1],
-          };
-          this.happyGlobalCacheTimestamp = Date.now();
-          return this.happyGlobalStatus;
+        try {
+          const npmOutput = JSON.parse(execError.stdout);
+          const happyInfo = npmOutput?.dependencies?.['happy-coder'];
+          if (happyInfo) {
+            this.happyGlobalStatus = {
+              installed: true,
+              version: happyInfo.version,
+            };
+            this.happyGlobalCacheTimestamp = Date.now();
+            return this.happyGlobalStatus;
+          }
+        } catch {
+          // JSON parse failed
         }
       }
       this.happyGlobalStatus = { installed: false };

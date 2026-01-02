@@ -22,14 +22,16 @@ const WINDOWS_SHELLS: ShellDefinition[] = [
     paths: ['C:\\Program Files\\PowerShell\\7\\pwsh.exe'],
     args: ['-NoLogo'],
     // -Login loads user profile (for version managers like vfox, nvm-windows, etc.)
-    execArgs: ['-NoLogo', '-Login', '-Command'],
+    // -ExecutionPolicy Bypass allows running .ps1 scripts (npm global packages use them)
+    execArgs: ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-Login', '-Command'],
   },
   {
     id: 'powershell',
     name: 'PowerShell',
     paths: ['powershell.exe'],
     args: ['-NoLogo'],
-    execArgs: ['-NoLogo', '-Command'],
+    // -ExecutionPolicy Bypass allows running .ps1 scripts (npm global packages use them)
+    execArgs: ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-Command'],
   },
   {
     id: 'cmd',
@@ -295,7 +297,7 @@ class ShellDetector {
     }
 
     return isWindows
-      ? { shell: 'powershell.exe', execArgs: ['-NoLogo', '-Command'] }
+      ? { shell: 'powershell.exe', execArgs: ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-Command'] }
       : { shell: '/bin/sh', execArgs: ['-c'] };
   }
 
@@ -315,7 +317,7 @@ class ShellDetector {
 
     // Fallback based on common shell names
     if (shellName.includes('pwsh') || shellName.includes('powershell')) {
-      return ['-NoLogo', '-Command'];
+      return ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-Command'];
     }
     if (shellName.includes('cmd')) {
       return ['/c'];
