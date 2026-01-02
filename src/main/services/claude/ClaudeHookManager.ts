@@ -162,10 +162,26 @@ function isHookConfigured(settings: ClaudeSettings): boolean {
 }
 
 /**
+ * Check if Claude CLI is installed by verifying .claude directory exists
+ * This prevents creating config files for users who don't have Claude installed
+ */
+export function isClaudeInstalled(): boolean {
+  const configDir = getClaudeConfigDir();
+  return fs.existsSync(configDir);
+}
+
+/**
  * Ensure the Stop hook is configured in Claude settings
  * Returns true if hook was added or already exists
+ * Returns false if Claude is not installed (skips setup)
  */
 export function ensureStopHook(): boolean {
+  // Skip hook setup if Claude is not installed
+  if (!isClaudeInstalled()) {
+    console.log('[ClaudeHookManager] Claude not installed, skipping hook setup');
+    return false;
+  }
+
   try {
     // Always ensure script file is up-to-date
     ensureHookScript();

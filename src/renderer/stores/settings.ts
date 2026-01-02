@@ -172,6 +172,7 @@ export interface ClaudeCodeIntegrationSettings {
   selectionChangedDebounce: number; // in milliseconds
   atMentionedKeybinding: TerminalKeybinding;
   stopHookEnabled: boolean; // Enable Stop hook for precise agent completion notifications
+  providers: import('@shared/types').ClaudeProvider[];
 }
 
 export const defaultClaudeCodeIntegrationSettings: ClaudeCodeIntegrationSettings = {
@@ -179,6 +180,7 @@ export const defaultClaudeCodeIntegrationSettings: ClaudeCodeIntegrationSettings
   selectionChangedDebounce: 300,
   atMentionedKeybinding: { key: 'm', meta: true, shift: true }, // Cmd/Ctrl+Shift+M
   stopHookEnabled: true, // Enable Stop hook for precise agent completion notifications
+  providers: [],
 };
 
 // Commit message generator settings
@@ -439,6 +441,9 @@ interface SettingsState {
   setAgentNotificationDelay: (delay: number) => void;
   setAgentNotificationEnterDelay: (delay: number) => void;
   setClaudeCodeIntegration: (settings: Partial<ClaudeCodeIntegrationSettings>) => void;
+  addClaudeProvider: (provider: import('@shared/types').ClaudeProvider) => void;
+  updateClaudeProvider: (id: string, updates: Partial<import('@shared/types').ClaudeProvider>) => void;
+  removeClaudeProvider: (id: string) => void;
   setCommitMessageGenerator: (settings: Partial<CommitMessageGeneratorSettings>) => void;
   setCodeReview: (settings: Partial<CodeReviewSettings>) => void;
   setAllowNightlyUpdates: (enabled: boolean) => void;
@@ -635,6 +640,29 @@ export const useSettingsStore = create<SettingsState>()(
       setClaudeCodeIntegration: (settings) =>
         set((state) => ({
           claudeCodeIntegration: { ...state.claudeCodeIntegration, ...settings },
+        })),
+      addClaudeProvider: (provider) =>
+        set((state) => ({
+          claudeCodeIntegration: {
+            ...state.claudeCodeIntegration,
+            providers: [...state.claudeCodeIntegration.providers, provider],
+          },
+        })),
+      updateClaudeProvider: (id, updates) =>
+        set((state) => ({
+          claudeCodeIntegration: {
+            ...state.claudeCodeIntegration,
+            providers: state.claudeCodeIntegration.providers.map((p) =>
+              p.id === id ? { ...p, ...updates } : p
+            ),
+          },
+        })),
+      removeClaudeProvider: (id) =>
+        set((state) => ({
+          claudeCodeIntegration: {
+            ...state.claudeCodeIntegration,
+            providers: state.claudeCodeIntegration.providers.filter((p) => p.id !== id),
+          },
         })),
       setCommitMessageGenerator: (settings) =>
         set((state) => ({

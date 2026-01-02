@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { IPC_CHANNELS } from '@shared/types';
 import { BrowserWindow, ipcMain } from 'electron';
 import { type RawData, type WebSocket, WebSocketServer } from 'ws';
-import { ensureStopHook, removeStopHook } from './ClaudeHookManager';
+import { ensureStopHook, isClaudeInstalled, removeStopHook } from './ClaudeHookManager';
 import { MCP_TOOLS } from './mcpTools';
 
 interface LockFilePayload {
@@ -382,6 +382,12 @@ export async function setClaudeBridgeEnabled(
   workspaceFolders?: string[]
 ): Promise<boolean> {
   if (enabled) {
+    // Skip bridge setup if Claude is not installed
+    if (!isClaudeInstalled()) {
+      console.log('[ClaudeIdeBridge] Claude not installed, skipping bridge setup');
+      return false;
+    }
+
     if (!bridgeInstance) {
       bridgeInstance = await startClaudeIdeBridge({
         ...bridgeOptions,

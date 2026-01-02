@@ -1,6 +1,8 @@
-import type { GitWorktree } from '@shared/types';
+import type { ClaudeProvider, GitWorktree } from '@shared/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  CheckCircle,
+  Circle,
   Clock,
   ExternalLink,
   FolderOpen,
@@ -23,6 +25,7 @@ import { toastManager } from '@/components/ui/toast';
 import { useDetectedApps, useOpenWith } from '@/hooks/useAppDetector';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/settings';
 
 function useCliInstallStatus() {
   return useQuery({
@@ -192,8 +195,59 @@ export function ActionPanel({
   // Recent commands
   const { recentIds, addRecentCommand } = useRecentCommands();
 
+  // Claude Provider
+  const queryClient = useQueryClient();
+  const providers = useSettingsStore((s) => s.claudeCodeIntegration.providers);
+
+  const { data: claudeData } = useQuery({
+    queryKey: ['claude-settings'],
+    queryFn: () => window.electronAPI.claudeProvider.readSettings(),
+    enabled: open, // 只在面板打开时查询
+  });
+
+  const activeProvider = React.useMemo(() => {
+    const env = claudeData?.settings?.env;
+    if (!env) return null;
+    return (
+      providers.find(
+        (p) => p.baseUrl === env.ANTHROPIC_BASE_URL && p.authToken === env.ANTHROPIC_AUTH_TOKEN
+      ) ?? null
+    );
+  }, [providers, claudeData?.settings]);
+
+  const applyProvider = useMutation({
+    mutationFn: (provider: ClaudeProvider) => window.electronAPI.claudeProvider.apply(provider),
+    onSuccess: (_, provider) => {
+      queryClient.invalidateQueries({ queryKey: ['claude-settings'] });
+      toastManager.add({
+        type: 'success',
+        title: t('Provider switched'),
+        description: provider.name,
+      });
+    },
+  });
+
   const actionGroups: ActionGroup[] = React.useMemo(() => {
-    const groups: ActionGroup[] = [
+    const groups: ActionGroup[] = [];
+
+    // Claude Provider group (only show if providers exist)
+    if (providers.length > 0) {
+      groups.push({
+        label: 'Claude Provider',
+        items: providers.map((provider) => ({
+          id: `claude-provider-${provider.id}`,
+          label: provider.name,
+          icon: activeProvider?.id === provider.id ? CheckCircle : Circle,
+          action: () => {
+            if (activeProvider?.id !== provider.id) {
+              applyProvider.mutate(provider);
+            }
+          },
+        })),
+      });
+    }
+
+    groups.push(
       {
         label: t('Panel'),
         items: [
@@ -247,8 +301,8 @@ export function ActionPanel({
             },
           },
         ],
-      },
-    ];
+      }
+    );
 
     // Add "Switch Repository" group
     if (repositories.length > 1 && onSwitchRepo) {
@@ -323,6 +377,9 @@ export function ActionPanel({
 
     return groups;
   }, [
+    providers,
+    activeProvider,
+    applyProvider,
     t,
     repositoryCollapsed,
     worktreeCollapsed,

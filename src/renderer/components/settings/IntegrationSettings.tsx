@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/i18n';
 import { useSettingsStore } from '@/stores/settings';
 import { KeybindingInput } from './KeybindingsSettings';
+import { ProviderList } from './claude-provider';
 
 export function IntegrationSettings() {
   const { t } = useI18n();
@@ -124,6 +125,17 @@ export function IntegrationSettings() {
               checked={claudeCodeIntegration.stopHookEnabled}
               onCheckedChange={(checked) => setClaudeCodeIntegration({ stopHookEnabled: checked })}
             />
+          </div>
+
+          {/* Claude Provider */}
+          <div className="mt-4 border-t pt-4">
+            <div className="mb-3">
+              <span className="text-sm font-medium">{t('Claude Provider')}</span>
+              <p className="text-xs text-muted-foreground">
+                {t('Manage Claude API provider configurations')}
+              </p>
+            </div>
+            <ProviderList />
           </div>
         </div>
       )}

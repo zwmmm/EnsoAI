@@ -429,6 +429,16 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.MCP_STOP_HOOK_SET, enabled),
   },
 
+  // Claude Provider
+  claudeProvider: {
+    readSettings: (): Promise<{
+      settings: import('@shared/types').ClaudeSettings | null;
+      extracted: Partial<import('@shared/types').ClaudeProvider> | null;
+    }> => ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_PROVIDER_READ_SETTINGS),
+    apply: (provider: import('@shared/types').ClaudeProvider): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_PROVIDER_APPLY, provider),
+  },
+
   // Search
   search: {
     files: (params: FileSearchParams): Promise<FileSearchResult[]> =>

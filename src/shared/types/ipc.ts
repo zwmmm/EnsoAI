@@ -123,6 +123,10 @@ export const IPC_CHANNELS = {
   MCP_AT_MENTIONED: 'mcp:at:mentioned',
   MCP_STOP_HOOK_SET: 'mcp:stopHook:set',
 
+  // Claude Provider
+  CLAUDE_PROVIDER_READ_SETTINGS: 'claude:provider:readSettings',
+  CLAUDE_PROVIDER_APPLY: 'claude:provider:apply',
+
   // Search
   SEARCH_FILES: 'search:files',
   SEARCH_CONTENT: 'search:content',

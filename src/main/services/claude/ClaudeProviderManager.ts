@@ -1,0 +1,128 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import type { ClaudeProvider, ClaudeSettings } from '@shared/types';
+
+function getClaudeConfigDir(): string {
+  if (process.env.CLAUDE_CONFIG_DIR) {
+    return process.env.CLAUDE_CONFIG_DIR;
+  }
+  return path.join(os.homedir(), '.claude');
+}
+
+function getClaudeSettingsPath(): string {
+  return path.join(getClaudeConfigDir(), 'settings.json');
+}
+
+/**
+ * 读取 ~/.claude/settings.json
+ */
+export function readClaudeSettings(): ClaudeSettings | null {
+  try {
+    const settingsPath = getClaudeSettingsPath();
+    if (!fs.existsSync(settingsPath)) {
+      return null;
+    }
+    const content = fs.readFileSync(settingsPath, 'utf-8');
+    return JSON.parse(content) as ClaudeSettings;
+  } catch (error) {
+    console.error('[ClaudeProviderManager] Failed to read settings:', error);
+    return null;
+  }
+}
+
+/**
+ * 从当前 settings.json 提取 Provider 相关字段
+ * 用于"保存为新配置"功能
+ */
+export function extractProviderFromSettings(): Partial<ClaudeProvider> | null {
+  const settings = readClaudeSettings();
+  if (!settings?.env?.ANTHROPIC_BASE_URL) {
+    return null;
+  }
+
+  return {
+    baseUrl: settings.env.ANTHROPIC_BASE_URL,
+    authToken: settings.env.ANTHROPIC_AUTH_TOKEN,
+    model: settings.model,
+    smallFastModel: settings.env.ANTHROPIC_SMALL_FAST_MODEL,
+    defaultSonnetModel: settings.env.ANTHROPIC_DEFAULT_SONNET_MODEL,
+    defaultOpusModel: settings.env.ANTHROPIC_DEFAULT_OPUS_MODEL,
+    defaultHaikuModel: settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL,
+  };
+}
+
+/**
+ * 应用 Provider 配置到 ~/.claude/settings.json
+ * 只更新 Provider 相关字段，保留其他配置
+ */
+export function applyProvider(provider: ClaudeProvider): boolean {
+  try {
+    const settingsPath = getClaudeSettingsPath();
+    let settings: ClaudeSettings = {};
+
+    // 读取现有配置
+    if (fs.existsSync(settingsPath)) {
+      const content = fs.readFileSync(settingsPath, 'utf-8');
+      settings = JSON.parse(content);
+    }
+
+    // 保留现有 env 中非 Provider 字段
+    const existingEnv = { ...(settings.env ?? {}) };
+
+    // 先清除所有 Provider 相关字段（防止残留）
+    delete existingEnv.ANTHROPIC_BASE_URL;
+    delete existingEnv.ANTHROPIC_AUTH_TOKEN;
+    delete existingEnv.ANTHROPIC_SMALL_FAST_MODEL;
+    delete existingEnv.ANTHROPIC_DEFAULT_SONNET_MODEL;
+    delete existingEnv.ANTHROPIC_DEFAULT_OPUS_MODEL;
+    delete existingEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL;
+
+    // 构建 Provider env 字段
+    const providerEnv: Record<string, string> = {
+      ANTHROPIC_BASE_URL: provider.baseUrl,
+      ANTHROPIC_AUTH_TOKEN: provider.authToken,
+    };
+
+    // 可选字段
+    if (provider.smallFastModel) {
+      providerEnv.ANTHROPIC_SMALL_FAST_MODEL = provider.smallFastModel;
+    }
+    if (provider.defaultSonnetModel) {
+      providerEnv.ANTHROPIC_DEFAULT_SONNET_MODEL = provider.defaultSonnetModel;
+    }
+    if (provider.defaultOpusModel) {
+      providerEnv.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.defaultOpusModel;
+    }
+    if (provider.defaultHaikuModel) {
+      providerEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.defaultHaikuModel;
+    }
+
+    // 合并 env（Provider 字段覆盖现有值）
+    settings.env = { ...existingEnv, ...providerEnv };
+
+    // 设置/清除 model 字段
+    if (provider.model) {
+      settings.model = provider.model;
+    } else {
+      delete settings.model;
+    }
+
+    // 确保目录存在
+    const configDir = getClaudeConfigDir();
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+    }
+
+    // 写入配置
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), {
+      mode: 0o600,
+    });
+
+    console.log(`[ClaudeProviderManager] Applied provider: ${provider.name}`);
+    return true;
+  } catch (error) {
+    console.error('[ClaudeProviderManager] Failed to apply provider:', error);
+    return false;
+  }
+}
