@@ -102,8 +102,8 @@ export function AgentTerminal({
     // Use custom path if provided, otherwise use agentCommand
     const effectiveCommand = customPath || agentCommand;
 
-    const supportsSession = agentCommand === 'claude';
-    const supportIde = agentCommand === 'claude';
+    const supportsSession = agentCommand?.startsWith('claude') ?? false;
+    const supportIde = agentCommand?.startsWith('claude') ?? false;
     const agentArgs =
       supportsSession && sessionId
         ? initialized
@@ -131,7 +131,9 @@ export function AgentTerminal({
 
       // Use global 'hapi' command if installed, otherwise use npx
       const hapiPrefix = hapiGlobalInstalled ? 'hapi' : 'npx -y @twsxtd/hapi';
-      const hapiCommand = `${hapiPrefix} ${effectiveCommand} ${agentArgs.join(' ')}`.trim();
+      // claude is default for hapi, so omit agent name for claude
+      const hapiArgs = agentCommand?.startsWith('claude') ? '' : effectiveCommand;
+      const hapiCommand = `${hapiPrefix} ${hapiArgs} ${agentArgs.join(' ')}`.trim();
 
       // Pass CLI_API_TOKEN from hapiSettings
       if (hapiSettings.cliApiToken) {
@@ -150,7 +152,7 @@ export function AgentTerminal({
     // Happy environment: run through 'happy' command
     // claude -> happy (claude is default), codex -> happy codex
     if (environment === 'happy') {
-      const happyArgs = agentCommand === 'claude' ? '' : effectiveCommand;
+      const happyArgs = agentCommand?.startsWith('claude') ? '' : effectiveCommand;
       const happyCommand = `happy ${happyArgs} ${agentArgs.join(' ')}`.trim();
 
       return {

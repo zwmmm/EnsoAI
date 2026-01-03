@@ -86,8 +86,9 @@ function configToServer(id: string, config: McpServerConfig): McpServer {
 
 /**
  * 将 McpServer 转换为配置
+ * 兼容旧数据：没有 transportType 但有 command 的服务器视为 stdio 类型
  */
-function serverToConfig(server: McpServer): McpServerConfig {
+function serverToConfig(server: McpServer): McpServerConfig | null {
   if (isHttpMcpServer(server)) {
     return {
       type: server.transportType,
@@ -95,8 +96,15 @@ function serverToConfig(server: McpServer): McpServerConfig {
       ...(server.headers && Object.keys(server.headers).length > 0 && { headers: server.headers }),
     } as McpHttpConfig;
   }
+  // 兼容旧数据：检查 command 字段是否存在
+  const command = isStdioMcpServer(server)
+    ? server.command
+    : (server as { command?: string }).command;
+  if (!command) {
+    return null;
+  }
   return {
-    command: server.command,
+    command,
     ...(server.args && server.args.length > 0 && { args: server.args }),
     ...(server.env && Object.keys(server.env).length > 0 && { env: server.env }),
   } as McpStdioConfig;
@@ -124,7 +132,13 @@ export function syncMcpServers(servers: McpServer[]): boolean {
       mcpServers[server.id] = existingConfig;
     } else {
       // 对于 stdio 类型，使用 server 数据
-      mcpServers[server.id] = serverToConfig(server);
+      const config = serverToConfig(server);
+      if (config) {
+        mcpServers[server.id] = config;
+      } else if (existingConfig) {
+        // 如果转换失败但存在原配置，保留原配置
+        mcpServers[server.id] = existingConfig;
+      }
     }
   }
 
@@ -157,17 +171,17 @@ export function upsertMcpServer(server: McpServer): boolean {
       // HTTP/SSE 类型，保留原有配置不修改
       // 因为这类配置需要通过 claude mcp 命令管理
       data.mcpServers[server.id] = existingConfig;
-    } else if (isHttpMcpServer(server)) {
-      // 新的 HTTP/SSE 服务器
-      data.mcpServers[server.id] = serverToConfig(server);
-    } else if (isStdioMcpServer(server) && server.command) {
-      // stdio 类型且有有效的 command
-      data.mcpServers[server.id] = serverToConfig(server);
-    } else if (existingConfig) {
-      // server 数据无效但存在原配置，保留原配置
-      data.mcpServers[server.id] = existingConfig;
+    } else {
+      // 转换 server 为配置（serverToConfig 已兼容旧数据）
+      const config = serverToConfig(server);
+      if (config) {
+        data.mcpServers[server.id] = config;
+      } else if (existingConfig) {
+        // 转换失败但存在原配置，保留原配置
+        data.mcpServers[server.id] = existingConfig;
+      }
+      // 如果转换失败且无原配置，不写入
     }
-    // 如果 server 无效且无原配置，不写入
   } else {
     // 如果禁用了，从配置中移除
     delete data.mcpServers[server.id];

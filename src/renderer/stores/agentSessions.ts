@@ -8,8 +8,10 @@ import { createInitialGroupState } from '@/components/chat/types';
 // Global storage key for all sessions across all repos
 const SESSIONS_STORAGE_KEY = 'enso-agent-sessions';
 
-// Agents that support session persistence
-const RESUMABLE_AGENTS = new Set(['claude']);
+// Check if an agent command supports session persistence
+function isResumableAgent(agentCommand: string): boolean {
+  return agentCommand?.startsWith('claude') ?? false;
+}
 
 // Group states indexed by normalized worktree path
 type WorktreeGroupStates = Record<string, AgentGroupState>;
@@ -58,7 +60,7 @@ function saveToStorage(sessions: Session[], activeIds: Record<string, string | n
   // 1. Using agents that support resumption (e.g., claude)
   // 2. Activated (user has pressed Enter at least once)
   const persistableSessions = sessions.filter(
-    (s) => RESUMABLE_AGENTS.has(s.agentCommand) && s.activated
+    (s) => isResumableAgent(s.agentCommand) && s.activated
   );
   const persistableIds = new Set(persistableSessions.map((s) => s.id));
   // Only keep activeIds that reference persistable sessions
