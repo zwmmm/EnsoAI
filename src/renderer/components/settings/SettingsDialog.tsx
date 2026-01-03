@@ -30,7 +30,7 @@ export function SettingsDialog({ trigger, open, onOpenChange }: SettingsDialogPr
     { id: 'editor', icon: FileCode, label: t('Editor') },
     { id: 'keybindings', icon: Keyboard, label: t('Keybindings') },
     { id: 'agent', icon: Bot, label: t('Agent') },
-    { id: 'integration', icon: Link, label: t('Integration') },
+    { id: 'integration', icon: Link, label: t('Claude Integration') },
     { id: 'hapi', icon: Share2, label: t('Remote Sharing') },
   ];
 
