@@ -31,6 +31,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
   const parserRef = useRef<StreamJsonParser>(new StreamJsonParser());
   const reviewIdRef = useRef<string | null>(null);
   const cleanupFnRef = useRef<(() => void) | null>(null);
+  const statusRef = useRef<ReviewStatus>('idle');
 
   // 清理函数
   const cleanup = useCallback(() => {
@@ -52,11 +53,17 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     };
   }, [cleanup]);
 
+  // 同步更新状态和 ref
+  const updateStatus = useCallback((newStatus: ReviewStatus) => {
+    statusRef.current = newStatus;
+    setStatus(newStatus);
+  }, []);
+
   // 处理单个事件
   const handleEvent = useCallback((event: StreamEvent) => {
     // 检查初始化事件
     if (StreamJsonParser.isInitEvent(event)) {
-      setStatus('streaming');
+      updateStatus('streaming');
       return;
     }
 
@@ -81,21 +88,21 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
       if (modelName !== null) {
         setModel(modelName);
       }
-      setStatus('complete');
+      updateStatus('complete');
     }
 
     // 检查错误事件
     if (StreamJsonParser.isErrorEvent(event)) {
-      setStatus('error');
+      updateStatus('error');
       setError(event.message?.toString() || 'Unknown error');
     }
-  }, []);
+  }, [updateStatus]);
 
   // 开始代码审查
   const startReview = useCallback(async () => {
     if (!repoPath) {
       setError('No repository path');
-      setStatus('error');
+      updateStatus('error');
       return;
     }
 
@@ -105,7 +112,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     setCost(null);
     setModel(null);
     setSessionId(null);
-    setStatus('initializing');
+    updateStatus('initializing');
     parserRef.current.reset();
     cleanup();
 
@@ -131,11 +138,12 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
           // stderr 输出通常是日志，不一定是错误
           console.warn('[CodeReview stderr]', event.data);
         } else if (event.type === 'exit') {
-          if (event.exitCode !== 0 && status !== 'complete') {
-            setStatus('error');
+          // 使用 ref 获取最新状态，避免闭包陷阱
+          if (event.exitCode !== 0 && statusRef.current !== 'complete') {
+            updateStatus('error');
             setError(`Process exited with code ${event.exitCode}`);
-          } else if (status !== 'error') {
-            setStatus('complete');
+          } else if (statusRef.current !== 'error') {
+            updateStatus('complete');
           }
           reviewIdRef.current = null;
         }
@@ -152,14 +160,14 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
       });
 
       if (!result.success) {
-        setStatus('error');
+        updateStatus('error');
         setError(result.error || 'Failed to start review');
         cleanup();
       } else if (result.sessionId) {
         setSessionId(result.sessionId);
       }
     } catch (err) {
-      setStatus('error');
+      updateStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to start review');
       cleanup();
     }
@@ -167,7 +175,7 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     repoPath,
     cleanup,
     handleEvent,
-    status,
+    updateStatus,
     codeReviewSettings.model,
     codeReviewSettings.language,
     codeReviewSettings.continueConversation,
@@ -176,8 +184,8 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
   // 停止审查
   const stopReview = useCallback(() => {
     cleanup();
-    setStatus('idle');
-  }, [cleanup]);
+    updateStatus('idle');
+  }, [cleanup, updateStatus]);
 
   // 重置状态
   const reset = useCallback(() => {
@@ -187,9 +195,9 @@ export function useCodeReview({ repoPath }: UseCodeReviewOptions): UseCodeReview
     setCost(null);
     setModel(null);
     setSessionId(null);
-    setStatus('idle');
+    updateStatus('idle');
     parserRef.current.reset();
-  }, [cleanup]);
+  }, [cleanup, updateStatus]);
 
   // 处理旧用户没有新字段的情况
   const continueConversation = codeReviewSettings.continueConversation ?? true;
