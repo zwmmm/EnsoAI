@@ -1,5 +1,14 @@
-import { FolderGit2, FolderMinus, PanelLeftClose, Plus, Search, Settings } from 'lucide-react';
+import {
+  FolderGit2,
+  FolderMinus,
+  PanelLeftClose,
+  Plus,
+  Search,
+  Settings,
+  Settings2,
+} from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { RepositorySettingsDialog } from '@/components/repository/RepositorySettingsDialog';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -54,6 +63,8 @@ export function RepositorySidebar({
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [menuRepo, setMenuRepo] = useState<Repository | null>(null);
   const [repoToRemove, setRepoToRemove] = useState<Repository | null>(null);
+  const [repoSettingsOpen, setRepoSettingsOpen] = useState(false);
+  const [repoSettingsTarget, setRepoSettingsTarget] = useState<Repository | null>(null);
 
   // Drag reorder
   const draggedIndexRef = useRef<number | null>(null);
@@ -224,7 +235,7 @@ export function RepositorySidebar({
                   onClick={() => onSelectRepo(repo.path)}
                   onContextMenu={(e) => handleContextMenu(e, repo)}
                   className={cn(
-                    'flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors',
+                    'group flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors',
                     selectedRepo === repo.path
                       ? 'bg-accent text-accent-foreground'
                       : 'hover:bg-accent/50',
@@ -241,7 +252,19 @@ export function RepositorySidebar({
                           : 'text-muted-foreground'
                       )}
                     />
-                    <span className="truncate font-medium">{repo.name}</span>
+                    <span className="truncate font-medium flex-1">{repo.name}</span>
+                    <button
+                      type="button"
+                      className="shrink-0 p-1 rounded hover:bg-muted"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRepoSettingsTarget(repo);
+                        setRepoSettingsOpen(true);
+                      }}
+                      title={t('Repository Settings')}
+                    >
+                      <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
                   </div>
                   {/* Path */}
                   <div
@@ -346,6 +369,15 @@ export function RepositorySidebar({
           </AlertDialogFooter>
         </AlertDialogPopup>
       </AlertDialog>
+
+      {repoSettingsTarget && (
+        <RepositorySettingsDialog
+          open={repoSettingsOpen}
+          onOpenChange={setRepoSettingsOpen}
+          repoPath={repoSettingsTarget.path}
+          repoName={repoSettingsTarget.name}
+        />
+      )}
     </aside>
   );
 }

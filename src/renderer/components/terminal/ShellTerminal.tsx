@@ -8,7 +8,8 @@ import { TerminalSearchBar, type TerminalSearchBarRef } from './TerminalSearchBa
 interface ShellTerminalProps {
   cwd?: string;
   isActive?: boolean;
-  canMerge?: boolean; // whether merge option should be enabled (has multiple groups)
+  canMerge?: boolean;
+  initialCommand?: string;
   onExit?: () => void;
   onTitleChange?: (title: string) => void;
   onSplit?: () => void;
@@ -19,12 +20,14 @@ export function ShellTerminal({
   cwd,
   isActive = false,
   canMerge = false,
+  initialCommand,
   onExit,
   onTitleChange,
   onSplit,
   onMerge,
 }: ShellTerminalProps) {
   const { t } = useI18n();
+  console.log('[ShellTerminal] render:', { cwd, isActive, initialCommand });
 
   const {
     containerRef,
@@ -39,6 +42,7 @@ export function ShellTerminal({
   } = useXterm({
     cwd,
     isActive,
+    initialCommand,
     onExit,
     onTitleChange,
     onSplit,

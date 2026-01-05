@@ -278,8 +278,22 @@ export class PtyManager {
       args = adjustArgsForShell(shell, args);
     }
 
+    const initialCommand = options.initialCommand?.trim();
+    if (initialCommand) {
+      if (isWindows) {
+        const isPowerShell =
+          shell.toLowerCase().includes('powershell') || shell.toLowerCase().includes('pwsh');
+        if (isPowerShell) {
+          args = ['-NoExit', '-Command', initialCommand];
+        } else {
+          args = ['/k', initialCommand];
+        }
+      } else {
+        args = [...args.filter((a) => a !== '-c'), '-c', `${initialCommand}; exec ${shell}`];
+      }
+    }
+
     let ptyProcess: pty.IPty;
-    // Login shell loads user's PATH from profile, no need to enhance
 
     try {
       ptyProcess = pty.spawn(shell, args, {

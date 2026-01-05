@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   TREE_SIDEBAR_WIDTH: 'enso-tree-sidebar-width',
   REPOSITORY_COLLAPSED: 'enso-repository-collapsed',
   WORKTREE_COLLAPSED: 'enso-worktree-collapsed',
+  REPOSITORY_SETTINGS: 'enso-repository-settings', // per-repo settings (init script, etc.)
 } as const;
 
 // Helper to get initial value from localStorage
@@ -94,4 +95,40 @@ export const normalizePath = (path: string): string => {
 // Check if two paths are equal (considering OS-specific rules)
 export const pathsEqual = (path1: string, path2: string): boolean => {
   return normalizePath(path1) === normalizePath(path2);
+};
+
+// Repository settings types and helpers
+export interface RepositorySettings {
+  autoInitWorktree: boolean;
+  initScript: string;
+}
+
+export const DEFAULT_REPOSITORY_SETTINGS: RepositorySettings = {
+  autoInitWorktree: false,
+  initScript: '',
+};
+
+export const getStoredRepositorySettings = (): Record<string, RepositorySettings> => {
+  const saved = localStorage.getItem(STORAGE_KEYS.REPOSITORY_SETTINGS);
+  if (saved) {
+    try {
+      return JSON.parse(saved) as Record<string, RepositorySettings>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+export const getRepositorySettings = (repoPath: string): RepositorySettings => {
+  const allSettings = getStoredRepositorySettings();
+  const normalizedPath = normalizePath(repoPath);
+  return allSettings[normalizedPath] || DEFAULT_REPOSITORY_SETTINGS;
+};
+
+export const saveRepositorySettings = (repoPath: string, settings: RepositorySettings): void => {
+  const allSettings = getStoredRepositorySettings();
+  const normalizedPath = normalizePath(repoPath);
+  allSettings[normalizedPath] = settings;
+  localStorage.setItem(STORAGE_KEYS.REPOSITORY_SETTINGS, JSON.stringify(allSettings));
 };

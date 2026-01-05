@@ -15,6 +15,8 @@ export interface TerminalCreateOptions {
   rows?: number;
   env?: Record<string, string>;
   shellConfig?: import('./shell').ShellConfig;
+  /** Command to execute after shell is ready */
+  initialCommand?: string;
 }
 
 export interface TerminalResizeOptions {

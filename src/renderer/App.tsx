@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import { panelTransition, type Repository, type TabId } from './App/constants';
 import {
+  getRepositorySettings,
   getStoredBoolean,
   getStoredTabMap,
   getStoredWorktreeMap,
@@ -51,6 +52,7 @@ import {
 } from './hooks/useWorktree';
 import { useI18n } from './i18n';
 import { useEditorStore } from './stores/editor';
+import { useInitScriptStore } from './stores/initScript';
 import { useNavigationStore } from './stores/navigation';
 import { useSettingsStore } from './stores/settings';
 import { useWorktreeStore } from './stores/worktree';
@@ -544,6 +546,8 @@ export default function App() {
     [repositories, saveRepositories]
   );
 
+  const setPendingScript = useInitScriptStore((s) => s.setPendingScript);
+
   const handleCreateWorktree = async (options: WorktreeCreateOptions) => {
     if (!selectedRepo) return;
     try {
@@ -551,8 +555,29 @@ export default function App() {
         workdir: selectedRepo,
         options,
       });
+
+      const repoSettings = getRepositorySettings(selectedRepo);
+      if (repoSettings.autoInitWorktree && repoSettings.initScript.trim()) {
+        const newWorktreePath = options.path;
+        const newWorktree: GitWorktree = {
+          path: newWorktreePath,
+          head: '',
+          branch: options.newBranch || options.branch || null,
+          isMainWorktree: false,
+          isLocked: false,
+          prunable: false,
+        };
+
+        handleSelectWorktree(newWorktree);
+        setActiveTab('terminal');
+        setTimeout(() => {
+          setPendingScript({
+            worktreePath: newWorktreePath,
+            script: repoSettings.initScript,
+          });
+        }, 100);
+      }
     } finally {
-      // Refresh branches on success/failure (git worktree add -b creates branches first).
       refetchBranches();
     }
   };

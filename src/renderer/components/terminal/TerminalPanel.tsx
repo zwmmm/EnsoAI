@@ -1,5 +1,5 @@
 import { Plus, Terminal } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizePath } from '@/App/storage';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/empty';
 import { useI18n } from '@/i18n';
 import { matchesKeybinding } from '@/lib/keybinding';
+import { useInitScriptStore } from '@/stores/initScript';
 import { useSettingsStore } from '@/stores/settings';
 import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
 import { ResizeHandle } from './ResizeHandle';
@@ -52,6 +53,8 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     (state) => state.autoCreateSessionOnActivate
   );
   const { setTerminalCount, registerTerminalCloseHandler } = useWorktreeActivityStore();
+  const { pendingScript, clearPendingScript } = useInitScriptStore();
+  const pendingScriptProcessedRef = useRef<string | null>(null);
 
   // Get current worktree's state
   const currentState = useMemo(() => {
@@ -651,6 +654,75 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     }
   }, [autoCreateSessionOnActivate, isActive, cwd, groups.length, handleNewTerminal]);
 
+  useEffect(() => {
+    console.log('[TerminalPanel] pendingScript effect:', {
+      pendingScript,
+      cwd,
+      groupsLength: groups.length,
+    });
+    if (!pendingScript || !cwd) return;
+
+    const normalizedPendingPath = normalizePath(pendingScript.worktreePath);
+    const normalizedCurrentCwd = normalizePath(cwd);
+
+    console.log('[TerminalPanel] path check:', { normalizedPendingPath, normalizedCurrentCwd });
+    if (normalizedPendingPath !== normalizedCurrentCwd) return;
+
+    const scriptKey = `${normalizedPendingPath}:${pendingScript.script}`;
+    if (pendingScriptProcessedRef.current === scriptKey) {
+      console.log('[TerminalPanel] script already processed, skipping');
+      clearPendingScript();
+      return;
+    }
+    pendingScriptProcessedRef.current = scriptKey;
+
+    const script = pendingScript.script.trim().replace(/\n+/g, ' && ');
+    console.log('[TerminalPanel] creating terminal with script:', script);
+
+    if (groups.length === 0) {
+      updateCurrentState(() => {
+        const newGroup: TerminalGroupType = {
+          id: crypto.randomUUID(),
+          tabs: [
+            {
+              id: crypto.randomUUID(),
+              name: 'Init',
+              cwd,
+              initialCommand: script,
+            },
+          ],
+          activeTabId: null,
+        };
+        newGroup.activeTabId = newGroup.tabs[0].id;
+        console.log('[TerminalPanel] created new group with tab:', newGroup);
+
+        return {
+          groups: [newGroup],
+          activeGroupId: newGroup.id,
+          flexPercents: [100],
+        };
+      });
+    } else {
+      const targetGroupId = activeGroupId || groups[0].id;
+      const newTab: TerminalTab = {
+        id: crypto.randomUUID(),
+        name: 'Init',
+        cwd,
+        initialCommand: script,
+      };
+      console.log('[TerminalPanel] adding tab to existing group:', { targetGroupId, newTab });
+
+      updateCurrentState((state) => ({
+        ...state,
+        groups: state.groups.map((g) =>
+          g.id === targetGroupId ? { ...g, tabs: [...g.tabs, newTab], activeTabId: newTab.id } : g
+        ),
+      }));
+    }
+
+    clearPendingScript();
+  }, [pendingScript, cwd, groups, activeGroupId, updateCurrentState, clearPendingScript]);
+
   if (!cwd) return null;
 
   const normalizedCwd = normalizePath(cwd);
@@ -792,6 +864,7 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
                       cwd={info.tab.cwd}
                       isActive={isTerminalActive}
                       canMerge={state.groups.length > 1}
+                      initialCommand={info.tab.initialCommand}
                       onExit={() => handleTerminalClose(tabId)}
                       onTitleChange={(title) => handleTitleChange(tabId, title)}
                       onSplit={() => handleSplit(info.group.id)}

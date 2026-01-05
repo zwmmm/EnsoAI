@@ -13,12 +13,14 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Settings2,
   Sparkles,
   Terminal,
   Trash2,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RepositorySettingsDialog } from '@/components/repository/RepositorySettingsDialog';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -120,6 +122,10 @@ export function TreeSidebar({
   const [repoMenuPosition, setRepoMenuPosition] = useState({ x: 0, y: 0 });
   const [repoMenuTarget, setRepoMenuTarget] = useState<Repository | null>(null);
   const [repoToRemove, setRepoToRemove] = useState<Repository | null>(null);
+
+  // Repository settings dialog
+  const [repoSettingsOpen, setRepoSettingsOpen] = useState(false);
+  const [repoSettingsTarget, setRepoSettingsTarget] = useState<Repository | null>(null);
 
   // Create worktree dialog (triggered from context menu)
   const [createWorktreeDialogOpen, setCreateWorktreeDialogOpen] = useState(false);
@@ -517,7 +523,7 @@ export function TreeSidebar({
                         toggleRepoExpanded(repo.path);
                       }}
                       className={cn(
-                        'flex w-full items-center gap-1 rounded-lg px-2 py-2 text-left transition-colors cursor-pointer',
+                        'group flex w-full items-center gap-1 rounded-lg px-2 py-2 text-left transition-colors cursor-pointer',
                         isSelected ? 'bg-accent/50 text-accent-foreground' : 'hover:bg-accent/30',
                         draggedRepoIndexRef.current === index && 'opacity-50'
                       )}
@@ -547,6 +553,18 @@ export function TreeSidebar({
                           {repo.path}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        className="shrink-0 p-1 rounded hover:bg-muted"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRepoSettingsTarget(repo);
+                          setRepoSettingsOpen(true);
+                        }}
+                        title={t('Repository Settings')}
+                      >
+                        <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
                     </button>
                     {/* Drop indicator - bottom */}
                     {dropRepoTargetIndex === index &&
@@ -702,6 +720,22 @@ export function TreeSidebar({
             >
               <Plus className="h-4 w-4" />
               {t('New Worktree')}
+            </button>
+
+            {/* Repository Settings */}
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+              onClick={() => {
+                setRepoMenuOpen(false);
+                if (repoMenuTarget) {
+                  setRepoSettingsTarget(repoMenuTarget);
+                  setRepoSettingsOpen(true);
+                }
+              }}
+            >
+              <Settings2 className="h-4 w-4" />
+              {t('Repository Settings')}
             </button>
 
             {/* Separator */}
@@ -868,6 +902,16 @@ export function TreeSidebar({
           refetchExpandedWorktrees();
         }}
       />
+
+      {/* Repository Settings Dialog */}
+      {repoSettingsTarget && (
+        <RepositorySettingsDialog
+          open={repoSettingsOpen}
+          onOpenChange={setRepoSettingsOpen}
+          repoPath={repoSettingsTarget.path}
+          repoName={repoSettingsTarget.name}
+        />
+      )}
     </aside>
   );
 }

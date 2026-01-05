@@ -30,28 +30,19 @@ function hasVisibleContent(data: string): boolean {
 
 export interface UseXtermOptions {
   cwd?: string;
-  /** Shell command and args to run */
   command?: {
     shell: string;
     args: string[];
   };
-  /** Environment variables to pass to the terminal */
   env?: Record<string, string>;
-  /** Lazy init - only initialize when true */
   isActive?: boolean;
-  /** Called when pty exits */
+  initialCommand?: string;
   onExit?: () => void;
-  /** Called with pty data for custom processing */
   onData?: (data: string) => void;
-  /** Custom key event handler, return false to prevent default */
   onCustomKey?: (event: KeyboardEvent, ptyId: string) => boolean;
-  /** Called when terminal title changes (via OSC escape sequence) */
   onTitleChange?: (title: string) => void;
-  /** Called when split pane shortcut is triggered */
   onSplit?: () => void;
-  /** Called when merge pane shortcut is triggered */
   onMerge?: () => void;
-  /** Whether merge is allowed (has multiple panes) */
   canMerge?: boolean;
 }
 
@@ -114,6 +105,7 @@ export function useXterm({
   command,
   env,
   isActive = true,
+  initialCommand,
   onExit,
   onData,
   onCustomKey,
@@ -154,6 +146,7 @@ export function useXterm({
   const hasBeenActivatedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasReceivedDataRef = useRef(false);
+  const initialCommandRef = useRef(initialCommand);
   // Memoize command key to avoid dependency array issues
   const commandKey = useMemo(
     () =>
@@ -491,6 +484,7 @@ export function useXterm({
         cols: terminal.cols,
         rows: terminal.rows,
         env,
+        initialCommand: initialCommandRef.current,
       });
 
       ptyIdRef.current = ptyId;
@@ -559,10 +553,17 @@ export function useXterm({
     }
   }, [cwd, command, shellConfig, commandKey, terminalRenderer]);
 
-  // Lazy initialization: only init when first activated
   useEffect(() => {
-    if (isActive && !hasBeenActivatedRef.current) {
+    const shouldActivate = isActive || initialCommandRef.current;
+    console.log('[useXterm] activation effect:', {
+      isActive,
+      shouldActivate,
+      hasBeenActivated: hasBeenActivatedRef.current,
+      initialCommand: initialCommandRef.current,
+    });
+    if (shouldActivate && !hasBeenActivatedRef.current) {
       hasBeenActivatedRef.current = true;
+      console.log('[useXterm] activating terminal');
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           initTerminal();

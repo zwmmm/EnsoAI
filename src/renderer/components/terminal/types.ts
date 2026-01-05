@@ -6,6 +6,7 @@ export interface TerminalTab {
   cwd: string;
   title?: string;
   userEdited?: boolean;
+  initialCommand?: string;
 }
 
 export interface TerminalGroup {

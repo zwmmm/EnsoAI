@@ -204,6 +204,14 @@ export const zhTranslations: Record<string, string> = {
   'Remove repository': '移除仓库',
   'Remove repository confirm': '移除仓库',
   'Remove repository description': '此操作只会从应用中移除，不会删除本地文件。',
+  'Repository Settings': '仓库设置',
+  'Auto-initialize new worktrees': '自动初始化新 Worktree',
+  'Automatically run init script when creating new worktrees':
+    '创建新 Worktree 时自动运行初始化脚本',
+  'Init Script': '初始化脚本',
+  'e.g., pnpm install && pnpm dev': '例如 pnpm install && pnpm dev',
+  'Commands to run after creating a new worktree. Multiple commands can be separated by && or newlines.':
+    '创建新 Worktree 后运行的命令。多个命令可用 && 或换行分隔。',
   Renderer: '渲染器',
   'Reset on new terminal': '更改后新建终端生效',
   Resume: '继续',
