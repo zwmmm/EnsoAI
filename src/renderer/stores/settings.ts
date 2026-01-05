@@ -435,7 +435,7 @@ interface SettingsState {
   claudeCodeIntegration: ClaudeCodeIntegrationSettings;
   commitMessageGenerator: CommitMessageGeneratorSettings;
   codeReview: CodeReviewSettings;
-  allowNightlyUpdates: boolean;
+  autoUpdateEnabled: boolean;
   hapiSettings: HapiSettings;
   defaultWorktreePath: string; // Default path for creating worktrees
   proxySettings: ProxySettings;
@@ -485,7 +485,7 @@ interface SettingsState {
   removeClaudeProvider: (id: string) => void;
   setCommitMessageGenerator: (settings: Partial<CommitMessageGeneratorSettings>) => void;
   setCodeReview: (settings: Partial<CodeReviewSettings>) => void;
-  setAllowNightlyUpdates: (enabled: boolean) => void;
+  setAutoUpdateEnabled: (enabled: boolean) => void;
   setHapiSettings: (settings: Partial<HapiSettings>) => void;
   setDefaultWorktreePath: (path: string) => void;
   setProxySettings: (settings: Partial<ProxySettings>) => void;
@@ -549,7 +549,7 @@ export const useSettingsStore = create<SettingsState>()(
       claudeCodeIntegration: defaultClaudeCodeIntegrationSettings,
       commitMessageGenerator: defaultCommitMessageGeneratorSettings,
       codeReview: defaultCodeReviewSettings,
-      allowNightlyUpdates: false,
+      autoUpdateEnabled: true,
       hapiSettings: defaultHapiSettings,
       defaultWorktreePath: '', // Empty means use default ~/ensoai/workspaces
       proxySettings: defaultProxySettings,
@@ -722,10 +722,9 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({
           codeReview: { ...state.codeReview, ...settings },
         })),
-      setAllowNightlyUpdates: (allowNightlyUpdates) => {
-        set({ allowNightlyUpdates });
-        // Notify main process to update autoUpdater setting
-        window.electronAPI.updater.setAllowPrerelease(allowNightlyUpdates);
+      setAutoUpdateEnabled: (autoUpdateEnabled) => {
+        set({ autoUpdateEnabled });
+        window.electronAPI.updater.setAutoUpdateEnabled(autoUpdateEnabled);
       },
       setHapiSettings: (settings) =>
         set((state) => ({

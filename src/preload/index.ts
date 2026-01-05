@@ -404,8 +404,8 @@ const electronAPI = {
   updater: {
     checkForUpdates: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATER_CHECK),
     quitAndInstall: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATER_QUIT_AND_INSTALL),
-    setAllowPrerelease: (allow: boolean): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_SET_ALLOW_PRERELEASE, allow),
+    setAutoUpdateEnabled: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_SET_AUTO_UPDATE_ENABLED, enabled),
     onStatus: (
       callback: (status: {
         status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';

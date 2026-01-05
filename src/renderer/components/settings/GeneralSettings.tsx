@@ -40,8 +40,8 @@ export function GeneralSettings() {
     setAgentNotificationDelay,
     agentNotificationEnterDelay,
     setAgentNotificationEnterDelay,
-    allowNightlyUpdates,
-    setAllowNightlyUpdates,
+    autoUpdateEnabled,
+    setAutoUpdateEnabled,
     defaultWorktreePath,
     setDefaultWorktreePath,
     proxySettings,
@@ -591,14 +591,14 @@ export function GeneralSettings() {
         </div>
       </div>
 
-      {/* Nightly Updates */}
+      {/* Auto Update */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t('Nightly updates')}</span>
+        <span className="text-sm font-medium">{t('Auto update')}</span>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {t('Check for nightly (pre-release) updates')}
+            {t('Automatically download and install updates')}
           </p>
-          <Switch checked={allowNightlyUpdates} onCheckedChange={setAllowNightlyUpdates} />
+          <Switch checked={autoUpdateEnabled} onCheckedChange={setAutoUpdateEnabled} />
         </div>
       </div>
     </div>

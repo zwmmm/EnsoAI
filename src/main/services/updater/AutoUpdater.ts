@@ -29,12 +29,8 @@ class AutoUpdaterService {
   private lastCheckTime = 0;
   private onFocusHandler: (() => void) | null = null;
 
-  init(window: BrowserWindow): void {
+  init(window: BrowserWindow, autoUpdateEnabled = true): void {
     this.mainWindow = window;
-
-    // Configure auto-updater
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
 
     // Enable logging in dev mode
     if (is.dev) {
@@ -75,16 +71,6 @@ class AutoUpdaterService {
       this.sendStatus({ status: 'error', error: error.message });
     });
 
-    // Check for updates after a short delay
-    setTimeout(() => {
-      this.checkForUpdates();
-    }, 3000);
-
-    // Set up periodic check (every 4 hours)
-    this.checkIntervalId = setInterval(() => {
-      this.checkForUpdates();
-    }, CHECK_INTERVAL_MS);
-
     // Check on window focus (with 30-minute debounce)
     this.onFocusHandler = () => {
       const now = Date.now();
@@ -93,6 +79,9 @@ class AutoUpdaterService {
       }
     };
     window.on('focus', this.onFocusHandler);
+
+    // Apply initial auto-update setting
+    this.setAutoUpdateEnabled(autoUpdateEnabled);
   }
 
   cleanup(): void {
@@ -141,8 +130,23 @@ class AutoUpdaterService {
     return this._isQuittingForUpdate;
   }
 
-  setAllowPrerelease(allow: boolean): void {
-    autoUpdater.allowPrerelease = allow;
+  setAutoUpdateEnabled(enabled: boolean): void {
+    autoUpdater.autoDownload = enabled;
+    autoUpdater.autoInstallOnAppQuit = enabled;
+
+    if (enabled) {
+      if (!this.checkIntervalId) {
+        this.checkIntervalId = setInterval(() => {
+          this.checkForUpdates();
+        }, CHECK_INTERVAL_MS);
+      }
+      setTimeout(() => this.checkForUpdates(), 3000);
+    } else {
+      if (this.checkIntervalId) {
+        clearInterval(this.checkIntervalId);
+        this.checkIntervalId = null;
+      }
+    }
   }
 }
 

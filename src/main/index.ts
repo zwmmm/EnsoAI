@@ -150,8 +150,15 @@ async function initAutoUpdater(window: BrowserWindow): Promise<void> {
     return;
   }
 
+  const { readSettings } = await import('./ipc/settings');
+  const settings = readSettings();
+  const ensoSettings = settings?.['enso-settings'] as
+    | { state?: { autoUpdateEnabled?: boolean } }
+    | undefined;
+  const autoUpdateEnabled = ensoSettings?.state?.autoUpdateEnabled ?? true;
+
   const { autoUpdaterService } = await import('./services/updater/AutoUpdater');
-  autoUpdaterService.init(window);
+  autoUpdaterService.init(window, autoUpdateEnabled);
 }
 
 async function init(): Promise<void> {
