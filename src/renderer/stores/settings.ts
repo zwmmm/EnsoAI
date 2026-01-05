@@ -805,7 +805,18 @@ export const useSettingsStore = create<SettingsState>()(
           ...persisted,
           // Override with migrated value
           ...(terminalRenderer && { terminalRenderer }),
+          // TODO: Remove this entire xtermKeybindings migration block after v1.0 release
+          // Legacy fields: terminalKeybindings, agentKeybindings, terminalPaneKeybindings
           xtermKeybindings: (() => {
+            // If user has already saved xtermKeybindings, use it directly (no legacy migration)
+            if (persisted.xtermKeybindings) {
+              return {
+                ...currentState.xtermKeybindings,
+                ...persisted.xtermKeybindings,
+              };
+            }
+
+            // Legacy migration: only runs when xtermKeybindings doesn't exist yet
             const filterDefined = <T extends object>(obj: T): Partial<T> =>
               Object.fromEntries(
                 Object.entries(obj).filter(([, v]) => v !== undefined)
@@ -830,7 +841,6 @@ export const useSettingsStore = create<SettingsState>()(
 
             return {
               ...currentState.xtermKeybindings,
-              ...persisted.xtermKeybindings,
               ...(legacy.terminalKeybindings &&
                 filterDefined({
                   newTab: legacy.terminalKeybindings.newTab,
@@ -920,6 +930,30 @@ export const useSettingsStore = create<SettingsState>()(
           if (state.proxySettings) {
             window.electronAPI.app.setProxy(state.proxySettings);
           }
+
+          // TODO: Remove this cleanup block after v1.0 release (along with xtermKeybindings migration)
+          window.electronAPI.settings.read().then((data) => {
+            if (data && typeof data === 'object') {
+              const settingsData = data as Record<string, unknown>;
+              const ensoSettings = settingsData['enso-settings'] as
+                | { state?: Record<string, unknown> }
+                | undefined;
+              if (ensoSettings?.state) {
+                const legacyFields = [
+                  'terminalKeybindings',
+                  'agentKeybindings',
+                  'terminalPaneKeybindings',
+                ];
+                const hasLegacy = legacyFields.some((f) => f in ensoSettings.state!);
+                if (hasLegacy) {
+                  for (const field of legacyFields) {
+                    delete ensoSettings.state[field];
+                  }
+                  window.electronAPI.settings.write(settingsData);
+                }
+              }
+            }
+          });
 
           // Auto-detect best shell on Windows for new users
           // Only run once: check localStorage flag to avoid overwriting user's explicit choice
