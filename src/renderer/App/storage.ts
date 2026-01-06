@@ -1,4 +1,4 @@
-import type { TabId } from './constants';
+import { DEFAULT_TAB_ORDER, type TabId } from './constants';
 
 // Storage keys
 export const STORAGE_KEYS = {
@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   ACTIVE_WORKTREES: 'enso-active-worktrees', // per-repo worktree map
   WORKTREE_TABS: 'enso-worktree-tabs',
   WORKTREE_ORDER: 'enso-worktree-order', // per-repo worktree display order map
+  TAB_ORDER: 'enso-tab-order', // panel tab order
   REPOSITORY_WIDTH: 'enso-repository-width',
   WORKTREE_WIDTH: 'enso-worktree-width',
   TREE_SIDEBAR_WIDTH: 'enso-tree-sidebar-width',
@@ -66,6 +67,54 @@ export const getStoredWorktreeOrderMap = (): Record<string, Record<string, numbe
 
 export const saveWorktreeOrderMap = (orderMap: Record<string, Record<string, number>>): void => {
   localStorage.setItem(STORAGE_KEYS.WORKTREE_ORDER, JSON.stringify(orderMap));
+};
+
+// Panel tab order: array of TabId
+const VALID_TAB_IDS = new Set<TabId>(DEFAULT_TAB_ORDER);
+
+const normalizeTabOrder = (order: unknown): TabId[] => {
+  if (!Array.isArray(order)) {
+    return [...DEFAULT_TAB_ORDER];
+  }
+
+  const next: TabId[] = [];
+  const seen = new Set<TabId>();
+
+  for (const id of order) {
+    if (typeof id === 'string' && VALID_TAB_IDS.has(id as TabId)) {
+      const typedId = id as TabId;
+      if (!seen.has(typedId)) {
+        next.push(typedId);
+        seen.add(typedId);
+      }
+    }
+  }
+
+  for (const id of DEFAULT_TAB_ORDER) {
+    if (!seen.has(id)) {
+      next.push(id);
+    }
+  }
+
+  return next;
+};
+
+export const getStoredTabOrder = (): TabId[] => {
+  const saved = localStorage.getItem(STORAGE_KEYS.TAB_ORDER);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as unknown;
+      return normalizeTabOrder(parsed);
+    } catch {
+      // Return default order on error
+    }
+  }
+  // Default order
+  return [...DEFAULT_TAB_ORDER];
+};
+
+export const saveTabOrder = (order: TabId[]): void => {
+  localStorage.setItem(STORAGE_KEYS.TAB_ORDER, JSON.stringify(normalizeTabOrder(order)));
 };
 
 // Get platform for path normalization

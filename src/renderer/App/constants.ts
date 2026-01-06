@@ -4,6 +4,16 @@ export const panelTransition = { type: 'spring' as const, stiffness: 400, dampin
 // Tab types
 export type TabId = 'chat' | 'file' | 'terminal' | 'source-control';
 
+// Tab metadata configuration
+export interface TabConfig {
+  id: TabId;
+  icon: React.ElementType;
+  labelKey: string;
+}
+
+// Default tab order
+export const DEFAULT_TAB_ORDER: TabId[] = ['chat', 'file', 'terminal', 'source-control'];
+
 // Repository type
 export interface Repository {
   name: string;

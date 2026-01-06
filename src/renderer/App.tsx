@@ -11,10 +11,12 @@ import { panelTransition, type Repository, type TabId } from './App/constants';
 import {
   getStoredBoolean,
   getStoredTabMap,
+  getStoredTabOrder,
   getStoredWorktreeMap,
   getStoredWorktreeOrderMap,
   pathsEqual,
   STORAGE_KEYS,
+  saveTabOrder,
   saveWorktreeOrderMap,
 } from './App/storage';
 import { useAppKeyboardShortcuts } from './App/useAppKeyboardShortcuts';
@@ -65,6 +67,8 @@ export default function App() {
   // Per-repo worktree display order: { [repoPath]: { [worktreePath]: displayOrder } }
   const [worktreeOrderMap, setWorktreeOrderMap] =
     useState<Record<string, Record<string, number>>>(getStoredWorktreeOrderMap);
+  // Panel tab order: custom order of tabs
+  const [tabOrder, setTabOrder] = useState<TabId[]>(getStoredTabOrder);
   const [activeTab, setActiveTab] = useState<TabId>('chat');
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -196,6 +200,11 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.WORKTREE_TABS, JSON.stringify(worktreeTabMap));
   }, [worktreeTabMap]);
 
+  // Persist panel tab order to localStorage
+  useEffect(() => {
+    saveTabOrder(tabOrder);
+  }, [tabOrder]);
+
   // Get worktrees for selected repo (used in columns mode)
   const {
     data: worktrees = [],
@@ -317,6 +326,25 @@ export default function App() {
     },
     [selectedRepo, worktrees, worktreeOrderMap]
   );
+
+  // Reorder panel tabs
+  const handleReorderTabs = useCallback((fromIndex: number, toIndex: number) => {
+    setTabOrder((prev) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
 
   // Sort worktrees by display order for the current repo
   const sortedWorktrees = selectedRepo
@@ -794,6 +822,8 @@ export default function App() {
       <MainContent
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        tabOrder={tabOrder}
+        onTabReorder={handleReorderTabs}
         repoPath={selectedRepo || undefined}
         worktreePath={activeWorktree?.path}
         repositoryCollapsed={repositoryCollapsed}

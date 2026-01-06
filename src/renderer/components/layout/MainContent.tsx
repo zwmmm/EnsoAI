@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { FileCode, FolderOpen, GitBranch, Sparkles, Terminal } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { DEFAULT_TAB_ORDER, type TabId } from '@/App/constants';
 import { OpenInMenu } from '@/components/app/OpenInMenu';
 import { AgentPanel } from '@/components/chat/AgentPanel';
 import { FilePanel } from '@/components/files';
@@ -18,12 +19,13 @@ import { cn } from '@/lib/utils';
 import { useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 import { TerminalPanel } from '../terminal';
 
-type TabId = 'chat' | 'file' | 'terminal' | 'source-control';
 type LayoutMode = 'columns' | 'tree';
 
 interface MainContentProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  tabOrder?: TabId[];
+  onTabReorder?: (fromIndex: number, toIndex: number) => void;
   repoPath?: string; // repository path for session storage
   worktreePath?: string;
   repositoryCollapsed?: boolean;
@@ -37,6 +39,8 @@ interface MainContentProps {
 export function MainContent({
   activeTab,
   onTabChange,
+  tabOrder = DEFAULT_TAB_ORDER,
+  onTabReorder,
   repoPath,
   worktreePath,
   repositoryCollapsed = false,
@@ -47,12 +51,97 @@ export function MainContent({
   onSwitchWorktree,
 }: MainContentProps) {
   const { t } = useI18n();
-  const tabs = [
-    { id: 'chat', icon: Sparkles, label: t('Agent') },
-    { id: 'file', icon: FileCode, label: t('File') },
-    { id: 'terminal', icon: Terminal, label: t('Terminal') },
-    { id: 'source-control', icon: GitBranch, label: t('Version Control') },
-  ] satisfies Array<{ id: TabId; icon: React.ElementType; label: string }>;
+
+  // Tab metadata configuration
+  const tabConfigMap: Record<TabId, { icon: React.ElementType; label: string }> = {
+    chat: { icon: Sparkles, label: t('Agent') },
+    file: { icon: FileCode, label: t('File') },
+    terminal: { icon: Terminal, label: t('Terminal') },
+    'source-control': { icon: GitBranch, label: t('Version Control') },
+  };
+
+  // Generate tabs array based on tabOrder
+  const tabs = tabOrder.map(
+    (id) => ({ id, ...tabConfigMap[id] }) as { id: TabId; icon: React.ElementType; label: string }
+  );
+
+  // Drag reorder state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const dragImageRef = useRef<HTMLDivElement | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const dragImage = document.createElement('div');
+    dragImage.style.cssText = `
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      padding: 8px 12px;
+      background-color: var(--accent);
+      color: var(--accent-foreground);
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 8px;
+      white-space: nowrap;
+      pointer-events: none;
+    `;
+    document.body.appendChild(dragImage);
+    dragImageRef.current = dragImage;
+
+    return () => {
+      dragImage.remove();
+      dragImageRef.current = null;
+    };
+  }, []);
+
+  const handleDragStart = useCallback((e: React.DragEvent, index: number, label: string) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+
+    const dragImage = dragImageRef.current;
+    if (dragImage) {
+      dragImage.textContent = label;
+      e.dataTransfer.setDragImage(dragImage, dragImage.offsetWidth / 2, dragImage.offsetHeight / 2);
+    }
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+    setDropTargetIndex(null);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, index: number) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (draggedIndex !== null && draggedIndex !== index) {
+        setDropTargetIndex((prev) => (prev === index ? prev : index));
+      }
+    },
+    [draggedIndex]
+  );
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) {
+      return;
+    }
+    setDropTargetIndex(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, toIndex: number) => {
+      e.preventDefault();
+      const fromIndex = draggedIndex;
+      if (fromIndex !== null && fromIndex !== toIndex && onTabReorder) {
+        onTabReorder(fromIndex, toIndex);
+      }
+      setDropTargetIndex(null);
+    },
+    [onTabReorder, draggedIndex]
+  );
+
   // Need extra padding for traffic lights when both panels are collapsed (macOS only)
   const isMac = window.electronAPI.env.platform === 'darwin';
   const needsTrafficLightPadding = isMac && repositoryCollapsed && worktreeCollapsed;
@@ -154,22 +243,50 @@ export function MainContent({
               </motion.div>
             )}
           </AnimatePresence>
-          {tabs.map((tab) => (
-            <button
-              type="button"
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={cn(
-                'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-colors',
-                activeTab === tab.id
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab, index) => {
+            const isDropTarget = dropTargetIndex === index;
+            const isDragging = draggedIndex === index;
+            return (
+              <div
+                key={tab.id}
+                draggable={!!onTabReorder}
+                onDragStart={onTabReorder ? (e) => handleDragStart(e, index, tab.label) : undefined}
+                onDragEnd={onTabReorder ? handleDragEnd : undefined}
+                onDragOver={onTabReorder ? (e) => handleDragOver(e, index) : undefined}
+                onDragLeave={onTabReorder ? handleDragLeave : undefined}
+                onDrop={onTabReorder ? (e) => handleDrop(e, index) : undefined}
+                aria-grabbed={isDragging}
+                aria-disabled={!onTabReorder}
+                className={cn(
+                  'relative flex items-center',
+                  isDragging && 'opacity-50',
+                  onTabReorder && 'cursor-grab active:cursor-grabbing'
+                )}
+              >
+                {/* Drop indicator */}
+                {isDropTarget && !isDragging && (
+                  <motion.div
+                    layoutId="tab-drop-indicator"
+                    className="absolute -top-0.5 left-0 right-0 h-0.5 bg-primary rounded-full"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => onTabChange(tab.id)}
+                  className={cn(
+                    'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-colors',
+                    activeTab === tab.id
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                  )}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         {/* Right: Open In Menu */}
