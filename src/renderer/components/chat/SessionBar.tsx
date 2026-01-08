@@ -469,38 +469,44 @@ export function SessionBar({
                     <div className="px-2 py-1 text-xs text-muted-foreground">
                       {t('Select Agent')}
                     </div>
-                    {enabledAgents.map((agentId) => {
-                      const isHapi = agentId.endsWith('-hapi');
-                      const isHappy = agentId.endsWith('-happy');
-                      const baseId = isHapi
-                        ? agentId.slice(0, -5)
-                        : isHappy
-                          ? agentId.slice(0, -6)
-                          : agentId;
-                      const customAgent = customAgents.find((a) => a.id === baseId);
-                      const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
-                      const name = isHapi
-                        ? `${baseName} (Hapi)`
-                        : isHappy
-                          ? `${baseName} (Happy)`
-                          : baseName;
-                      const isDefault = agentSettings[agentId]?.isDefault;
-                      return (
-                        <button
-                          type="button"
-                          key={agentId}
-                          onClick={() => handleSelectAgent(agentId)}
-                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
-                        >
-                          <span>{name}</span>
-                          {isDefault && (
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {t('(default)')}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
+                    {[...enabledAgents]
+                      .sort((a, b) => {
+                        const aDefault = agentSettings[a]?.isDefault ? 1 : 0;
+                        const bDefault = agentSettings[b]?.isDefault ? 1 : 0;
+                        return bDefault - aDefault;
+                      })
+                      .map((agentId) => {
+                        const isHapi = agentId.endsWith('-hapi');
+                        const isHappy = agentId.endsWith('-happy');
+                        const baseId = isHapi
+                          ? agentId.slice(0, -5)
+                          : isHappy
+                            ? agentId.slice(0, -6)
+                            : agentId;
+                        const customAgent = customAgents.find((a) => a.id === baseId);
+                        const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
+                        const name = isHapi
+                          ? `${baseName} (Hapi)`
+                          : isHappy
+                            ? `${baseName} (Happy)`
+                            : baseName;
+                        const isDefault = agentSettings[agentId]?.isDefault;
+                        return (
+                          <button
+                            type="button"
+                            key={agentId}
+                            onClick={() => handleSelectAgent(agentId)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
+                          >
+                            <span>{name}</span>
+                            {isDefault && (
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {t('(default)')}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               )}

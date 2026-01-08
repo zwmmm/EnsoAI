@@ -990,42 +990,50 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
               <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-50 min-w-40">
                 <div className="rounded-lg border bg-popover p-1 shadow-lg">
                   <div className="px-2 py-1 text-xs text-muted-foreground">{t('Select Agent')}</div>
-                  {enabledAgents.map((agentId) => {
-                    const isHapi = agentId.endsWith('-hapi');
-                    const isHappy = agentId.endsWith('-happy');
-                    const baseId = isHapi
-                      ? agentId.slice(0, -5)
-                      : isHappy
-                        ? agentId.slice(0, -6)
-                        : agentId;
-                    const customAgent = customAgents.find((a) => a.id === baseId);
-                    const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
-                    const name = isHapi
-                      ? `${baseName} (Hapi)`
-                      : isHappy
-                        ? `${baseName} (Happy)`
-                        : baseName;
-                    const isDefault = agentSettings[agentId]?.isDefault;
-                    return (
-                      <button
-                        type="button"
-                        key={agentId}
-                        onClick={() => {
-                          handleNewSessionWithAgent(
-                            agentId,
-                            customAgent?.command ?? AGENT_INFO[baseId]?.command ?? 'claude'
-                          );
-                          setShowAgentMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                      >
-                        <span>{name}</span>
-                        {isDefault && (
-                          <span className="text-xs text-muted-foreground">{t('(default)')}</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {[...enabledAgents]
+                    .sort((a, b) => {
+                      const aDefault = agentSettings[a]?.isDefault ? 1 : 0;
+                      const bDefault = agentSettings[b]?.isDefault ? 1 : 0;
+                      return bDefault - aDefault;
+                    })
+                    .map((agentId) => {
+                      const isHapi = agentId.endsWith('-hapi');
+                      const isHappy = agentId.endsWith('-happy');
+                      const baseId = isHapi
+                        ? agentId.slice(0, -5)
+                        : isHappy
+                          ? agentId.slice(0, -6)
+                          : agentId;
+                      const customAgent = customAgents.find((a) => a.id === baseId);
+                      const baseName = customAgent?.name ?? AGENT_INFO[baseId]?.name ?? baseId;
+                      const name = isHapi
+                        ? `${baseName} (Hapi)`
+                        : isHappy
+                          ? `${baseName} (Happy)`
+                          : baseName;
+                      const isDefault = agentSettings[agentId]?.isDefault;
+                      return (
+                        <button
+                          type="button"
+                          key={agentId}
+                          onClick={() => {
+                            handleNewSessionWithAgent(
+                              agentId,
+                              customAgent?.command ?? AGENT_INFO[baseId]?.command ?? 'claude'
+                            );
+                            setShowAgentMenu(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground whitespace-nowrap"
+                        >
+                          <span>{name}</span>
+                          {isDefault && (
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {t('(default)')}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
             )}
