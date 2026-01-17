@@ -53,11 +53,9 @@ const codexCliProvider = createCodexCli({
   },
 });
 
-// Gemini CLI provider with read-only tools
 const geminiCliProvider = createGeminiCli({
   defaultSettings: {
-    allowedTools: ['read_file', 'list_directory', 'search_files'],
-    approvalMode: 'yolo',
+    allowedTools: [],
   },
 });
 
