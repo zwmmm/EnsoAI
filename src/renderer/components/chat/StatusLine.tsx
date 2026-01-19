@@ -92,7 +92,7 @@ function shortenPath(p: string): string {
   // Show last 2 segments for brevity
   const parts = p.split('/').filter(Boolean);
   if (parts.length <= 2) return p;
-  return '.../' + parts.slice(-2).join('/');
+  return `.../${parts.slice(-2).join('/')}`;
 }
 
 interface DirItemProps {
@@ -167,29 +167,6 @@ export function StatusLine({ sessionId, onHeightChange }: StatusLineProps) {
   );
   const { claudeCodeIntegration } = useSettingsStore();
   const { statusLineEnabled, statusLineFields } = claudeCodeIntegration;
-
-  // Report height changes
-  useEffect(() => {
-    if (!onHeightChange) return;
-
-    const el = containerRef.current;
-    if (!el) {
-      onHeightChange(0);
-      return;
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        onHeightChange(entry.contentRect.height + 1); // +1 for border
-      }
-    });
-
-    observer.observe(el);
-    // Initial height
-    onHeightChange(el.offsetHeight);
-
-    return () => observer.disconnect();
-  }, [onHeightChange]);
 
   const items = useMemo(() => {
     if (!status || !statusLineEnabled) {
@@ -330,6 +307,27 @@ export function StatusLine({ sessionId, onHeightChange }: StatusLineProps) {
 
     return elements;
   }, [status, statusLineEnabled, statusLineFields]);
+
+  useEffect(() => {
+    if (!onHeightChange) return;
+
+    const el = containerRef.current;
+    if (!el) {
+      onHeightChange(0);
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        onHeightChange(entry.contentRect.height + 1);
+      }
+    });
+
+    observer.observe(el);
+    onHeightChange(el.offsetHeight + 1);
+
+    return () => observer.disconnect();
+  }, [onHeightChange]);
 
   // Report 0 height when not rendering
   useEffect(() => {
