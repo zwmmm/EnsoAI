@@ -34,8 +34,8 @@ interface AgentTerminalProps {
 const MIN_RUNTIME_FOR_AUTO_CLOSE = 10000; // 10 seconds
 const MIN_OUTPUT_FOR_NOTIFICATION = 100; // Minimum chars to consider agent is doing work
 const MIN_OUTPUT_FOR_INDICATOR = 200; // Minimum chars to show "outputting" indicator (higher to avoid noise)
-const ACTIVITY_POLL_INTERVAL_MS = 500; // Poll process activity every 500ms
-const IDLE_CONFIRMATION_COUNT = 4; // Require 4 consecutive idle polls (2 seconds) before marking as idle
+const ACTIVITY_POLL_INTERVAL_MS = 1000; // Poll process activity every 1000ms
+const IDLE_CONFIRMATION_COUNT = 2; // Require 2 consecutive idle polls (2 seconds) before marking as idle
 const RECENT_OUTPUT_TIMEOUT_MS = 3000; // If output received within this time, consider still active
 
 export function AgentTerminal({
@@ -65,6 +65,7 @@ export function AgentTerminal({
     hapiSettings,
     shellConfig,
     claudeCodeIntegration,
+    glowEffectEnabled,
   } = useSettingsStore();
 
   // Track if hapi is globally installed (cached in main process)
@@ -468,11 +469,12 @@ export function AgentTerminal({
         // Reset output counter.
         dataSinceEnterRef.current = 0;
 
-        // Start monitoring for AI output (only track after user presses Enter)
-        isMonitoringOutputRef.current = true;
-        outputSinceEnterRef.current = 0;
-        ptyIdRef.current = ptyId; // Store PTY ID for activity polling
-        startActivityPolling(); // Start polling for process activity
+        if (sessionId && glowEffectEnabled) {
+          isMonitoringOutputRef.current = true;
+          outputSinceEnterRef.current = 0;
+          ptyIdRef.current = ptyId;
+          startActivityPolling();
+        }
 
         // Clear any existing enter delay timer.
         if (enterDelayTimerRef.current) {
@@ -514,7 +516,14 @@ export function AgentTerminal({
 
       return true;
     },
-    [activated, onActivated, agentNotificationEnterDelay, startActivityPolling]
+    [
+      activated,
+      onActivated,
+      agentNotificationEnterDelay,
+      startActivityPolling,
+      sessionId,
+      glowEffectEnabled,
+    ]
   );
 
   // Wait for shell config and hapi check to complete before activating terminal
