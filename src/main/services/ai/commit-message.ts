@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
-import { generateText } from 'ai';
-import { type AIProvider, getModel, type ModelId, type ReasoningEffort } from './providers';
+import type { AIProvider, ModelId, ReasoningEffort } from '@shared/types';
+import { parseCLIOutput, spawnCLI } from './providers';
 
 export interface CommitMessageOptions {
   workdir: string;
@@ -48,28 +48,59 @@ ${stagedStat || '(no stats)'}
 变更详情：
 ${truncatedDiff}`;
 
-  try {
-    console.log(`[commit-msg] Starting with provider=${provider}, model=${model}, cwd=${workdir}`);
-    const modelInstance = getModel(model, { provider, reasoningEffort, cwd: workdir });
-    console.log(`[commit-msg] Model instance created, prompt length: ${prompt.length}`);
+  return new Promise((resolve) => {
+    const timeoutMs = timeout * 1000;
 
-    const { text } = await generateText({
-      model: modelInstance,
+    console.log(`[commit-msg] Starting with provider=${provider}, model=${model}, cwd=${workdir}`);
+
+    const { proc, kill } = spawnCLI({
+      provider,
+      model,
       prompt,
-      abortSignal: AbortSignal.timeout(timeout * 1000),
+      cwd: workdir,
+      reasoningEffort,
+      outputFormat: 'json',
     });
-    console.log(`[commit-msg] Success, response length: ${text.length}`);
-    return { success: true, message: text.trim() };
-  } catch (err) {
-    console.error(`[commit-msg] Error:`, err);
-    if (err instanceof Error) {
-      console.error(`[commit-msg] Error name: ${err.name}, message: ${err.message}`);
-      console.error(`[commit-msg] Error stack:`, err.stack);
-      if ('cause' in err && err.cause) {
-        console.error(`[commit-msg] Error cause:`, err.cause);
+
+    let stdout = '';
+    let stderr = '';
+
+    const timer = setTimeout(() => {
+      kill();
+      resolve({ success: false, error: 'timeout' });
+    }, timeoutMs);
+
+    proc.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+
+      if (code !== 0) {
+        console.error(`[commit-msg] Exit code: ${code}, stderr: ${stderr}`);
+        resolve({ success: false, error: stderr || `Exit code: ${code}` });
+        return;
       }
-    }
-    const error = err instanceof Error ? err.message : 'Unknown error';
-    return { success: false, error };
-  }
+
+      const result = parseCLIOutput(provider, stdout);
+      console.log(`[commit-msg] Parse result:`, result);
+
+      if (result.success && result.text) {
+        resolve({ success: true, message: result.text.trim() });
+      } else {
+        resolve({ success: false, error: result.error || 'Unknown error' });
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      console.error(`[commit-msg] Process error:`, err);
+      resolve({ success: false, error: err.message });
+    });
+  });
 }

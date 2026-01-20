@@ -1,5 +1,5 @@
-import { generateText } from 'ai';
-import { type AIProvider, getModel, type ModelId, type ReasoningEffort } from './providers';
+import type { AIProvider, ModelId, ReasoningEffort } from '@shared/types';
+import { parseCLIOutput, spawnCLI } from './providers';
 
 export interface BranchNameOptions {
   workdir: string;
@@ -19,18 +19,59 @@ export interface BranchNameResult {
 export async function generateBranchName(options: BranchNameOptions): Promise<BranchNameResult> {
   const { workdir, prompt, provider, model, reasoningEffort, timeout = 120 } = options;
 
-  try {
-    const { text } = await generateText({
-      model: getModel(model, { provider, reasoningEffort, cwd: workdir }),
+  return new Promise((resolve) => {
+    const timeoutMs = timeout * 1000;
+
+    console.log(`[branch-name] Starting with provider=${provider}, model=${model}, cwd=${workdir}`);
+
+    const { proc, kill } = spawnCLI({
+      provider,
+      model,
       prompt,
-      abortSignal: AbortSignal.timeout(timeout * 1000),
+      cwd: workdir,
+      reasoningEffort,
+      outputFormat: 'json',
     });
-    return { success: true, branchName: text.trim() };
-  } catch (err) {
-    if (err instanceof Error && err.name === 'TimeoutError') {
-      return { success: false, error: 'timeout' };
-    }
-    const error = err instanceof Error ? err.message : 'Unknown error';
-    return { success: false, error };
-  }
+
+    let stdout = '';
+    let stderr = '';
+
+    const timer = setTimeout(() => {
+      kill();
+      resolve({ success: false, error: 'timeout' });
+    }, timeoutMs);
+
+    proc.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+
+      if (code !== 0) {
+        console.error(`[branch-name] Exit code: ${code}, stderr: ${stderr}`);
+        resolve({ success: false, error: stderr || `Exit code: ${code}` });
+        return;
+      }
+
+      const result = parseCLIOutput(provider, stdout);
+      console.log(`[branch-name] Parse result:`, result);
+
+      if (result.success && result.text) {
+        resolve({ success: true, branchName: result.text.trim() });
+      } else {
+        resolve({ success: false, error: result.error || 'Unknown error' });
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      console.error(`[branch-name] Process error:`, err);
+      resolve({ success: false, error: err.message });
+    });
+  });
 }

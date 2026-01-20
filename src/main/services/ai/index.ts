@@ -5,4 +5,4 @@ export {
   type CommitMessageResult,
   generateCommitMessage,
 } from './commit-message';
-export { type AIProvider, getModel, type ModelId, type ReasoningEffort } from './providers';
+export type { AIProvider, ModelId, ReasoningEffort } from './providers';

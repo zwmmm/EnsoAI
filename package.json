@@ -45,10 +45,6 @@
     "@xterm/addon-web-links": "^0.13.0-beta.91",
     "@xterm/addon-webgl": "^0.20.0-beta.90",
     "@xterm/xterm": "^6.1.0-beta.91",
-    "ai": "^6.0.37",
-    "ai-sdk-provider-claude-code": "^3.2.1",
-    "ai-sdk-provider-codex-cli": "^1.0.4",
-    "ai-sdk-provider-gemini-cli": "^2.0.1",
     "class-variance-authority": "^0.7.1",
     "cloudflared": "^0.7.1",
     "clsx": "^2.1.1",
@@ -109,16 +105,7 @@
     "overrides": {
       "dmg-builder": "26.4.0",
       "app-builder-lib": "26.4.0",
-      "electron-builder-squirrel-windows": "26.4.0",
-      "@openai/codex": "link:",
-      "googleapis": "link:",
-      "@google-cloud/logging": "link:",
-      "@google-cloud/opentelemetry-cloud-monitoring-exporter": "link:",
-      "@google-cloud/opentelemetry-cloud-trace-exporter": "link:"
-    },
-    "patchedDependencies": {
-      "ai-sdk-provider-codex-cli": "patches/ai-sdk-provider-codex-cli.patch",
-      "@google/gemini-cli-core@0.22.4": "patches/@google__gemini-cli-core@0.22.4.patch"
+      "electron-builder-squirrel-windows": "26.4.0"
     }
   }
 }
