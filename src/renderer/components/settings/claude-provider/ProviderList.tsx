@@ -4,6 +4,7 @@ import { CheckCircle, Circle, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { toastManager } from '@/components/ui/toast';
+import { useShouldPoll } from '@/hooks/useWindowFocus';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings';
@@ -18,27 +19,30 @@ export function ProviderList({ className }: ProviderListProps) {
   const queryClient = useQueryClient();
   const providers = useSettingsStore((s) => s.claudeCodeIntegration.providers);
   const removeClaudeProvider = useSettingsStore((s) => s.removeClaudeProvider);
+  const shouldPoll = useShouldPoll();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingProvider, setEditingProvider] = React.useState<ClaudeProvider | null>(null);
   const [saveFromCurrent, setSaveFromCurrent] = React.useState(false);
 
-  // 读取当前 Claude settings
-  // 主要依赖 IPC 实时监听机制同步配置变化，轮询作为备用保障（30 秒间隔）
+  // 读取当前 Claude settings（窗口空闲时停止轮询）
   const { data: claudeData } = useQuery({
     queryKey: ['claude-settings'],
     queryFn: () => window.electronAPI.claudeProvider.readSettings(),
-    refetchInterval: 30000,
+    refetchInterval: shouldPoll ? 30000 : false,
   });
 
   // 监听 settings.json 文件变化事件（由主进程 fs.watch 触发）
   // 当外部工具（如 cc-switch）修改配置时，立即刷新数据
+  // 窗口空闲时停止监听以节省资源
   React.useEffect(() => {
+    if (!shouldPoll) return;
+
     const cleanup = window.electronAPI.claudeProvider.onSettingsChanged(() => {
       queryClient.invalidateQueries({ queryKey: ['claude-settings'] });
     });
     return cleanup;
-  }, [queryClient]);
+  }, [queryClient, shouldPoll]);
 
   // 计算当前激活的 Provider
   const activeProvider = React.useMemo(() => {

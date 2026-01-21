@@ -18,6 +18,19 @@ function getClaudeSettingsPath(): string {
 
 let settingsWatcher: fs.FSWatcher | null = null;
 let debounceTimer: NodeJS.Timeout | null = null;
+let lastProviderSnapshot: string | null = null; // 上次 Provider 配置快照
+
+/**
+ * 比较 Provider 配置是否变化
+ */
+function hasProviderChanged(extracted: Partial<ClaudeProvider> | null): boolean {
+  const currentSnapshot = JSON.stringify(extracted);
+  if (currentSnapshot === lastProviderSnapshot) {
+    return false;
+  }
+  lastProviderSnapshot = currentSnapshot;
+  return true;
+}
 
 /**
  * 监听 ~/.claude/settings.json 的变化
@@ -41,6 +54,9 @@ export function watchClaudeSettings(window: BrowserWindow): void {
     }
   }
 
+  // 初始化快照
+  lastProviderSnapshot = JSON.stringify(extractProviderFromSettings());
+
   // 监听目录而不是文件，因为很多编辑器保存时会先删除文件再新建
   try {
     settingsWatcher = fs.watch(configDir, (eventType, filename) => {
@@ -60,15 +76,23 @@ export function watchClaudeSettings(window: BrowserWindow): void {
             return;
           }
 
-          // 读取新配置并推送到前端
+          // 读取新配置
           try {
             const settings = readClaudeSettings();
             const extracted = extractProviderFromSettings();
 
-            window.webContents.send(IPC_CHANNELS.CLAUDE_PROVIDER_SETTINGS_CHANGED, {
-              settings,
-              extracted,
-            });
+            // 仅在 Provider 配置实际变化时推送通知
+            if (hasProviderChanged(extracted)) {
+              console.log('[ClaudeProviderManager] Provider config changed, notifying frontend');
+              window.webContents.send(IPC_CHANNELS.CLAUDE_PROVIDER_SETTINGS_CHANGED, {
+                settings,
+                extracted,
+              });
+            } else {
+              console.log(
+                '[ClaudeProviderManager] Provider config unchanged, skipping notification'
+              );
+            }
           } catch (err) {
             console.warn('[ClaudeProviderManager] Failed to read settings after change:', err);
           }
@@ -99,6 +123,7 @@ export function unwatchClaudeSettings(): void {
     settingsWatcher.close();
     settingsWatcher = null;
   }
+  lastProviderSnapshot = null;
 }
 
 /**
