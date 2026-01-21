@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
+import { useShouldPoll } from './useWindowFocus';
 
 interface FileChangeEvent {
   type: 'create' | 'update' | 'delete';
@@ -9,6 +10,7 @@ interface FileChangeEvent {
 export function useFileWatcher(dirPath: string | null) {
   const [changes, setChanges] = useState<FileChangeEvent[]>([]);
   const queryClient = useQueryClient();
+  const shouldPoll = useShouldPoll();
 
   const handleChange = useCallback(
     (event: FileChangeEvent) => {
@@ -19,7 +21,7 @@ export function useFileWatcher(dirPath: string | null) {
   );
 
   useEffect(() => {
-    if (!dirPath) return;
+    if (!dirPath || !shouldPoll) return;
 
     window.electronAPI.file.watchStart(dirPath);
     const unsubscribe = window.electronAPI.file.onChange(handleChange);
@@ -28,7 +30,7 @@ export function useFileWatcher(dirPath: string | null) {
       unsubscribe();
       window.electronAPI.file.watchStop(dirPath);
     };
-  }, [dirPath, handleChange]);
+  }, [dirPath, handleChange, shouldPoll]);
 
   const clearChanges = useCallback(() => {
     setChanges([]);

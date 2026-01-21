@@ -36,6 +36,7 @@ import { GlowBorder, type GlowState, useGlowEffectEnabled } from '@/components/u
 import { toastManager } from '@/components/ui/toast';
 import { CreateWorktreeDialog } from '@/components/worktree/CreateWorktreeDialog';
 import { useWorktreeOutputState } from '@/hooks/useOutputState';
+import { useShouldPoll } from '@/hooks/useWindowFocus';
 import { useI18n } from '@/i18n';
 import { springFast } from '@/lib/motion';
 import { cn } from '@/lib/utils';
@@ -176,11 +177,10 @@ export function WorktreePanel({
 
   const fetchDiffStats = useWorktreeActivityStore((s) => s.fetchDiffStats);
   const activities = useWorktreeActivityStore((s) => s.activities);
+  const shouldPoll = useShouldPoll();
 
-  // Fetch diff stats only for worktrees with active sessions, periodically (every 10 seconds)
   useEffect(() => {
-    if (worktrees.length === 0) return;
-    // Only fetch for worktrees that have active agent or terminal sessions
+    if (worktrees.length === 0 || !shouldPoll) return;
     const activePaths = worktrees
       .filter((wt) => {
         const activity = activities[wt.path];
@@ -190,14 +190,12 @@ export function WorktreePanel({
 
     if (activePaths.length === 0) return;
 
-    // Initial fetch
     fetchDiffStats(activePaths);
-    // Periodic refresh
     const interval = setInterval(() => {
       fetchDiffStats(activePaths);
     }, 10000);
     return () => clearInterval(interval);
-  }, [worktrees, activities, fetchDiffStats]);
+  }, [worktrees, activities, fetchDiffStats, shouldPoll]);
 
   return (
     <aside className="flex h-full w-full flex-col border-r bg-background">

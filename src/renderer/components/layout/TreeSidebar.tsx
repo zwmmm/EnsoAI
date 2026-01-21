@@ -50,6 +50,7 @@ import { RepoItemWithGlow } from '@/components/ui/glow-wrappers';
 import { toastManager } from '@/components/ui/toast';
 import { CreateWorktreeDialog } from '@/components/worktree/CreateWorktreeDialog';
 import { useWorktreeOutputState } from '@/hooks/useOutputState';
+import { useShouldPoll } from '@/hooks/useWindowFocus';
 import { useWorktreeListMultiple } from '@/hooks/useWorktree';
 import { useI18n } from '@/i18n';
 import { hexToRgba } from '@/lib/colors';
@@ -214,16 +215,14 @@ export function TreeSidebar({
   const mainWorktree = selectedRepoWorktrees.find((wt) => wt.isMainWorktree);
   const workdir = mainWorktree?.path || selectedRepo || '';
 
-  // Fetch diff stats for worktrees with active sessions
   const fetchDiffStats = useWorktreeActivityStore((s) => s.fetchDiffStats);
   const activities = useWorktreeActivityStore((s) => s.activities);
+  const shouldPoll = useShouldPoll();
 
   useEffect(() => {
-    // Get all worktrees from all expanded repos
     const allWorktrees = Object.values(worktreesMap).flat();
-    if (allWorktrees.length === 0) return;
+    if (allWorktrees.length === 0 || !shouldPoll) return;
 
-    // Filter to only worktrees with active sessions
     const activePaths = allWorktrees
       .filter((wt) => {
         const activity = activities[wt.path];
@@ -233,14 +232,12 @@ export function TreeSidebar({
 
     if (activePaths.length === 0) return;
 
-    // Initial fetch
     fetchDiffStats(activePaths);
-    // Periodic refresh
     const interval = setInterval(() => {
       fetchDiffStats(activePaths);
     }, 10000);
     return () => clearInterval(interval);
-  }, [worktreesMap, activities, fetchDiffStats]);
+  }, [worktreesMap, activities, fetchDiffStats, shouldPoll]);
 
   // Auto-expand selected repo (only when selectedRepo changes externally, not from tree click)
   const prevSelectedRepoRef = useRef<string | null>(null);
