@@ -341,44 +341,42 @@ export function IntegrationSettings({ scrollToProvider }: IntegrationSettingsPro
               </div>
             </div>
           )}
-
-          {/* Provider Switcher in SessionBar */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <span className="text-sm font-medium">{t('Provider Switcher')}</span>
-              <p className="text-xs text-muted-foreground">
-                {t('Show provider switcher in SessionBar for quick switching')}
-              </p>
-            </div>
-            <Switch
-              checked={claudeCodeIntegration.showProviderSwitcher ?? true}
-              onCheckedChange={(checked) =>
-                setClaudeCodeIntegration({ showProviderSwitcher: checked })
-              }
-            />
-          </div>
-
-          {/* Claude Provider */}
-          <div ref={providerRef} className="mt-4 border-t pt-4">
-            <div className="mb-3">
-              <span className="text-sm font-medium">{t('Claude Provider')}</span>
-              <p className="text-xs text-muted-foreground">
-                {t('Manage Claude API provider configurations')}
-              </p>
-            </div>
-            <ProviderList />
-          </div>
-
-          {/* MCP Servers */}
-          <McpSection />
-
-          {/* Plugins */}
-          <PluginsSection />
-
-          {/* Prompts */}
-          <PromptsSection />
         </div>
       )}
+
+      {/* Provider Switcher in SessionBar */}
+      <div className="flex items-center justify-between border-t pt-4">
+        <div className="space-y-0.5">
+          <span className="text-sm font-medium">{t('Provider Switcher')}</span>
+          <p className="text-xs text-muted-foreground">
+            {t('Show provider switcher in SessionBar for quick switching')}
+          </p>
+        </div>
+        <Switch
+          checked={claudeCodeIntegration.showProviderSwitcher ?? true}
+          onCheckedChange={(checked) => setClaudeCodeIntegration({ showProviderSwitcher: checked })}
+        />
+      </div>
+
+      {/* Claude Provider */}
+      <div ref={providerRef} className="border-t pt-4">
+        <div className="mb-3">
+          <span className="text-sm font-medium">{t('Claude Provider')}</span>
+          <p className="text-xs text-muted-foreground">
+            {t('Manage Claude API provider configurations')}
+          </p>
+        </div>
+        <ProviderList />
+      </div>
+
+      {/* MCP Servers */}
+      <McpSection />
+
+      {/* Plugins */}
+      <PluginsSection />
+
+      {/* Prompts */}
+      <PromptsSection />
     </div>
   );
 }
