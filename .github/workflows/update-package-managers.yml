@@ -472,12 +472,13 @@ jobs:
           sed -i "s/SHA256_PLACEHOLDER/${SHA256}/" PKGBUILD
 
       - name: Publish to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v4
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
         with:
           pkgname: ensoai
           pkgbuild: ./PKGBUILD
+          updpkgsums: true
           commit_username: github-actions[bot]
           commit_email: github-actions[bot]@users.noreply.github.com
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ steps.version.outputs.version }}"
-          force_push: true
+          ssh_keyscan_types: rsa,ecdsa,ed25519
