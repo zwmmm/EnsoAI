@@ -599,6 +599,7 @@ export function SourceControlPanel({
                 rootPath={rootPath}
                 fileDiff={commitDiff}
                 filePath={selectedCommitFile}
+                isActive={isActive}
                 isLoading={commitDiffLoading}
                 onPrevFile={handlePrevCommitFile}
                 onNextFile={handleNextCommitFile}
@@ -612,6 +613,7 @@ export function SourceControlPanel({
               <DiffViewer
                 rootPath={rootPath}
                 file={selectedFile}
+                isActive={isActive}
                 onPrevFile={handlePrevFile}
                 onNextFile={handleNextFile}
                 hasPrevFile={currentFileIndex > 0}
