@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enso Web Inspector
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.4
 // @description  选中页面元素并发送到 Enso，具备现代化的 UI 界面
 // @author       Enso
 // @match        *://*/*
@@ -26,7 +26,7 @@
       BORDER: 'rgba(79, 70, 229, 0.5)',
     },
     ICONS: {
-      TARGET: `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>`,
+      TARGET: `<img src="https://raw.githubusercontent.com/J3n5en/EnsoAI/refs/heads/main/build/icon.png" width="48" height="48" style="pointer-events:none;">`,
       CLOSE: `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
     },
   };
@@ -89,8 +89,9 @@
           color: ${CONFIG.THEME.PRIMARY};
           cursor: grab; z-index: 2147483647;
           box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: box-shadow 0.3s, transform 0.3s;
           user-select: none; touch-action: none;
+          will-change: left, top;
         }
         .enso-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
         .enso-fab:active { cursor: grabbing; transform: scale(0.95); }
@@ -139,6 +140,16 @@
       btn.className = 'enso-fab';
       btn.innerHTML = CONFIG.ICONS.TARGET;
       btn.title = '开启元素选择 (可拖动)';
+
+      // 恢复保存的位置
+      const savedPos = GM_getValue('btnPosition', null);
+      if (savedPos) {
+        btn.style.left = `${savedPos.x}px`;
+        btn.style.top = `${savedPos.y}px`;
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+      }
+
       document.body.appendChild(btn);
       this.elements.btn = btn;
 
@@ -169,6 +180,7 @@
 
       let startPos = { x: 0, y: 0 };
       let btnPos = { x: 0, y: 0 };
+      let rafId = null;
 
       const onMouseDown = (e) => {
         if (e.button !== 0) return;
@@ -188,16 +200,28 @@
           this.isDragging = true;
         }
         if (this.isDragging) {
-          btn.style.left = `${btnPos.x + dx}px`;
-          btn.style.top = `${btnPos.y + dy}px`;
-          btn.style.right = 'auto';
-          btn.style.bottom = 'auto';
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            const newX = btnPos.x + dx;
+            const newY = btnPos.y + dy;
+            btn.style.left = `${newX}px`;
+            btn.style.top = `${newY}px`;
+            btn.style.right = 'auto';
+            btn.style.bottom = 'auto';
+          });
         }
       };
 
       const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        if (rafId) cancelAnimationFrame(rafId);
+
+        // 保存位置
+        if (this.isDragging) {
+          const rect = btn.getBoundingClientRect();
+          GM_setValue('btnPosition', { x: rect.left, y: rect.top });
+        }
       };
 
       btn.addEventListener('mousedown', onMouseDown);
