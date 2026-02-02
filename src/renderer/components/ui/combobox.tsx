@@ -139,22 +139,28 @@ function ComboboxPopup({
   const { chipsRef, rootRef } = React.useContext(ComboboxContext);
 
   // Detect modal context by checking if the combobox root is inside a dialog
-  const computedZIndex = React.useMemo(() => {
-    if (zIndex !== undefined) return zIndex;
-
+  // NOTE: Not using useMemo because rootRef.current is null on first render
+  // and ref changes don't trigger re-renders. This logic is lightweight (a few
+  // DOM queries) and only runs when the popup renders (i.e. when open).
+  let computedZIndex: number = Z_INDEX.DROPDOWN;
+  if (zIndex !== undefined) {
+    computedZIndex = zIndex;
+  } else {
     const rootEl = rootRef?.current;
-    if (!rootEl) return Z_INDEX.DROPDOWN;
-
-    // Check if inside a nested modal first
-    const nestedModal = rootEl.closest('[data-slot="dialog-popup"] [data-slot="dialog-popup"]');
-    if (nestedModal) return Z_INDEX.DROPDOWN_IN_NESTED_MODAL;
-
-    // Check if inside a modal
-    const modal = rootEl.closest('[data-slot="dialog-popup"]');
-    if (modal) return Z_INDEX.DROPDOWN_IN_MODAL;
-
-    return Z_INDEX.DROPDOWN;
-  }, [zIndex, rootRef]);
+    if (rootEl) {
+      // Check if inside a nested modal first
+      const nestedModal = rootEl.closest('[data-slot="dialog-popup"] [data-slot="dialog-popup"]');
+      if (nestedModal) {
+        computedZIndex = Z_INDEX.DROPDOWN_IN_NESTED_MODAL;
+      } else {
+        // Check if inside a modal
+        const modal = rootEl.closest('[data-slot="dialog-popup"]');
+        if (modal) {
+          computedZIndex = Z_INDEX.DROPDOWN_IN_MODAL;
+        }
+      }
+    }
+  }
 
   return (
     <ComboboxPrimitive.Portal>
@@ -382,20 +388,20 @@ function ComboboxChipRemove(props: ComboboxPrimitive.ChipRemove.Props) {
 
 export {
   Combobox,
-  ComboboxInput,
-  ComboboxTrigger,
-  ComboboxPopup,
-  ComboboxItem,
-  ComboboxSeparator,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxClear,
+  ComboboxCollection,
+  ComboboxEmpty,
   ComboboxGroup,
   ComboboxGroupLabel,
-  ComboboxEmpty,
-  ComboboxValue,
+  ComboboxInput,
+  ComboboxItem,
   ComboboxList,
-  ComboboxClear,
-  ComboboxStatus,
+  ComboboxPopup,
   ComboboxRow,
-  ComboboxCollection,
-  ComboboxChips,
-  ComboboxChip,
+  ComboboxSeparator,
+  ComboboxStatus,
+  ComboboxTrigger,
+  ComboboxValue,
 };
