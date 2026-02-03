@@ -3,12 +3,14 @@ import type { FileChange, GitSubmodule } from '@shared/types';
 import {
   ChevronDown,
   ChevronRight,
+  Expand,
   FileCode,
   FolderGit2,
   Loader2,
   MessageSquare,
   Plus,
   Send,
+  Shrink,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -300,6 +302,7 @@ export function DiffReviewModal({
   const [isThemeReady, setIsThemeReady] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
   const [expandedSubmodules, setExpandedSubmodules] = useState<Set<string>>(new Set());
+  const [isMaximized, setIsMaximized] = useState(true);
 
   // Editor refs
   const editorRef = useRef<DiffEditorInstance | null>(null);
@@ -1005,8 +1008,23 @@ export function DiffReviewModal({
   const hasComments = allComments.length > 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="max-w-[90vw] w-[1200px] h-[90vh] flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
+      <DialogPopup
+        className={
+          isMaximized
+            ? 'max-w-[98vw] w-[98vw] h-[95vh] flex flex-col'
+            : 'max-w-[90vw] w-[1200px] h-[90vh] flex flex-col'
+        }
+      >
+        {/* Maximize button in top right corner */}
+        <button
+          type="button"
+          onClick={() => setIsMaximized(!isMaximized)}
+          className="absolute end-12 top-2.5 z-50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
+          title={isMaximized ? t('Restore') : t('Maximize')}
+        >
+          {isMaximized ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+        </button>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
