@@ -450,15 +450,23 @@ export class GitService {
   }
 
   async push(remote = 'origin', branch?: string, setUpstream = false): Promise<void> {
-    if (setUpstream && branch) {
-      await this.git.push(['-u', remote, branch]);
-    } else {
-      await this.git.push(remote, branch);
-    }
+    const doPush = async () => {
+      if (setUpstream && branch) {
+        await this.git.push(['-u', remote, branch]);
+      } else {
+        await this.git.push(remote, branch);
+      }
+    };
+    await this.smartPush(doPush, () => this.smartPull(this.git));
   }
 
   async pull(remote = 'origin', branch?: string): Promise<void> {
-    await this.git.pull(remote, branch);
+    // 如果指定了 remote/branch，使用原始方式
+    if (branch) {
+      await this.git.pull(remote, branch);
+    } else {
+      await this.smartPull(this.git);
+    }
   }
 
   async fetch(remote = 'origin'): Promise<void> {
@@ -1097,6 +1105,47 @@ export class GitService {
   }
 
   /**
+   * 智能 Pull（公共逻辑）
+   * 1. 先尝试 fast-forward only
+   * 2. 失败则尝试 rebase
+   * 3. 冲突则 abort 并抛出错误
+   */
+  private async smartPull(git: SimpleGit): Promise<void> {
+    try {
+      await git.pull(['--ff-only']);
+    } catch {
+      try {
+        await git.pull(['--rebase']);
+      } catch (rebaseError) {
+        try {
+          await git.rebase(['--abort']);
+        } catch {
+          // ignore abort error
+        }
+        throw rebaseError;
+      }
+    }
+  }
+
+  /**
+   * 智能 Push（公共逻辑）
+   * 如果 non-fast-forward，自动先 pull 再重试
+   */
+  private async smartPush(pushFn: () => Promise<void>, pullFn: () => Promise<void>): Promise<void> {
+    try {
+      await pushFn();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('non-fast-forward') || msg.includes('rejected')) {
+        await pullFn();
+        await pushFn();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Fetch 单个子模块
    */
   async fetchSubmodule(submodulePath: string): Promise<void> {
@@ -1109,7 +1158,7 @@ export class GitService {
    */
   async pullSubmodule(submodulePath: string): Promise<void> {
     const subGit = this.getSubmoduleGit(submodulePath);
-    await subGit.pull();
+    await this.smartPull(subGit);
   }
 
   /**
@@ -1117,7 +1166,10 @@ export class GitService {
    */
   async pushSubmodule(submodulePath: string): Promise<void> {
     const subGit = this.getSubmoduleGit(submodulePath);
-    await subGit.push();
+    await this.smartPush(
+      () => subGit.push(),
+      () => this.smartPull(subGit)
+    );
   }
 
   /**
