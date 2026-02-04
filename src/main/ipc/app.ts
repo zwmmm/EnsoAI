@@ -40,7 +40,7 @@ export function registerAppHandlers() {
     return await getRecentProjects();
   });
 
-  ipcMain.handle(IPC_CHANNELS.GIT_VALIDATE_LOCAL_PATH, (_, path: string) => {
-    return validateLocalPath(path);
+  ipcMain.handle(IPC_CHANNELS.GIT_VALIDATE_LOCAL_PATH, async (_, path: string) => {
+    return await validateLocalPath(path);
   });
 }
