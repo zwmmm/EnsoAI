@@ -84,7 +84,7 @@ async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorPro
 
   let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    db = new Database(dbPath, { readonly: true, fileMustExist: true, timeout: 1000 });
     const row = db
       .prepare("SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList'")
       .get() as { value: string } | undefined;
