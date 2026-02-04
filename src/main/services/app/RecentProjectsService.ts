@@ -64,7 +64,8 @@ function readEditorProjects(editor: EditorConfig): RecentEditorProject[] {
 
   try {
     // Open database in readonly mode to prevent lock conflicts
-    const db = new Database(dbPath, { readonly: true });
+    // fileMustExist ensures we don't create an empty database if file was removed
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
 
     try {
       // Query the ItemTable for history.recentlyOpenedPathsList
@@ -125,6 +126,17 @@ function readEditorProjects(editor: EditorConfig): RecentEditorProject[] {
 }
 
 /**
+ * Normalize path for case-insensitive comparison on Windows/macOS.
+ * Linux filesystems are case-sensitive, so no normalization is needed there.
+ */
+function normalizePathForDedup(inputPath: string): string {
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    return inputPath.toLowerCase();
+  }
+  return inputPath;
+}
+
+/**
  * Get recent projects from all supported editors.
  * Results are deduplicated by path (first occurrence wins).
  * Uses permanent in-memory cache (cleared only when app closes).
@@ -142,9 +154,10 @@ export function getRecentProjects(): RecentEditorProject[] {
     const projects = readEditorProjects(editor);
 
     for (const project of projects) {
-      // Deduplicate across editors
-      if (!seenPaths.has(project.path)) {
-        seenPaths.add(project.path);
+      // Deduplicate across editors (case-insensitive on Windows/macOS)
+      const normalizedPath = normalizePathForDedup(project.path);
+      if (!seenPaths.has(normalizedPath)) {
+        seenPaths.add(normalizedPath);
         allProjects.push(project);
       }
     }
