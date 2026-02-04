@@ -1,7 +1,6 @@
-import { existsSync, statSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import type { RecentEditorProject } from '@shared/types';
 import Database from 'better-sqlite3';
 
@@ -14,10 +13,9 @@ let refreshPromise: Promise<RecentEditorProject[]> | null = null;
 interface EditorConfig {
   name: string;
   bundleId: string;
-  configDir: string; // Directory name inside Application Support/config
+  configDir: string;
 }
 
-// Editor configurations for supported VS Code-like editors
 const EDITOR_CONFIGS: EditorConfig[] = [
   { name: 'VS Code', bundleId: 'com.microsoft.VSCode', configDir: 'Code' },
   {
@@ -31,33 +29,38 @@ const EDITOR_CONFIGS: EditorConfig[] = [
 ];
 
 /**
- * Get the storage path for a given editor config based on platform.
+ * Get the state.vscdb path for an editor based on platform.
  */
-function getStoragePath(editor: EditorConfig): string {
+function getStoragePath(configDir: string): string {
   const home = homedir();
-  const platform = process.platform;
+  const subPath = ['User', 'globalStorage', 'state.vscdb'];
 
-  if (platform === 'darwin') {
-    return join(
-      home,
-      'Library',
-      'Application Support',
-      editor.configDir,
-      'User',
-      'globalStorage',
-      'state.vscdb'
-    );
-  } else if (platform === 'win32') {
+  if (process.platform === 'darwin') {
+    return join(home, 'Library', 'Application Support', configDir, ...subPath);
+  }
+  if (process.platform === 'win32') {
     const appData = process.env.APPDATA || join(home, 'AppData', 'Roaming');
-    return join(appData, editor.configDir, 'User', 'globalStorage', 'state.vscdb');
-  } else {
-    // Linux
-    return join(home, '.config', editor.configDir, 'User', 'globalStorage', 'state.vscdb');
+    return join(appData, configDir, ...subPath);
+  }
+  return join(home, '.config', configDir, ...subPath);
+}
+
+/**
+ * Convert file:// URI to filesystem path.
+ */
+function fileUriToPath(uri: string): string | null {
+  if (!uri.startsWith('file://')) return null;
+  try {
+    const fsPath = decodeURIComponent(new URL(uri).pathname);
+    // Windows: remove leading slash from /C:/path
+    return process.platform === 'win32' && fsPath.startsWith('/') ? fsPath.slice(1) : fsPath;
+  } catch {
+    return null;
   }
 }
 
 /**
- * Check if a path exists (async).
+ * Check if path exists.
  */
 async function pathExists(path: string): Promise<boolean> {
   try {
@@ -70,156 +73,80 @@ async function pathExists(path: string): Promise<boolean> {
 
 /**
  * Read recent projects from an editor's state.vscdb database.
- * Database read is sync (better-sqlite3), but wrapped in async for path checks.
  */
 async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorProject[]> {
-  const dbPath = getStoragePath(editor);
+  const dbPath = getStoragePath(editor.configDir);
+  if (!(await pathExists(dbPath))) return [];
 
-  if (!(await pathExists(dbPath))) {
-    return [];
-  }
-
+  let db: Database.Database | null = null;
   try {
-    // Open database in readonly mode to prevent lock conflicts
-    // fileMustExist ensures we don't create an empty database if file was removed
-    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const row = db
+      .prepare("SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList'")
+      .get() as { value: string } | undefined;
 
-    try {
-      // Query the ItemTable for history.recentlyOpenedPathsList
-      const row = db
-        .prepare("SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList'")
-        .get() as { value: string } | undefined;
+    if (!row?.value) return [];
 
-      if (!row || !row.value) {
-        return [];
-      }
+    const data = JSON.parse(row.value) as { entries?: Array<{ folderUri?: unknown }> };
+    const entries = data.entries || [];
 
-      const data = JSON.parse(row.value);
-      const entries = data.entries || [];
-      const projects: RecentEditorProject[] = [];
+    // Extract valid paths from entries
+    const paths = entries
+      .map((e) => (typeof e.folderUri === 'string' ? fileUriToPath(e.folderUri) : null))
+      .filter((p): p is string => p !== null);
 
-      // Collect all paths first, then batch check existence
-      const candidates: { path: string; editor: EditorConfig }[] = [];
+    // Batch check existence
+    const existsResults = await Promise.all(paths.map(pathExists));
 
-      for (const entry of entries) {
-        // Only process folder URIs (not files or remote)
-        const folderUri = entry.folderUri;
-        if (!folderUri || typeof folderUri !== 'string') {
-          continue;
-        }
-
-        // Only handle file:// protocol
-        if (!folderUri.startsWith('file://')) {
-          continue;
-        }
-
-        try {
-          // Convert file URI to filesystem path
-          const url = new URL(folderUri);
-          const fsPath = decodeURIComponent(url.pathname);
-
-          // On Windows, remove leading slash from /C:/path
-          const normalizedPath =
-            process.platform === 'win32' && fsPath.startsWith('/') ? fsPath.slice(1) : fsPath;
-
-          candidates.push({ path: normalizedPath, editor });
-        } catch {
-          // Skip invalid URIs
-        }
-      }
-
-      // Batch check path existence in parallel
-      const existsResults = await Promise.all(candidates.map((c) => pathExists(c.path)));
-
-      for (let i = 0; i < candidates.length; i++) {
-        if (existsResults[i]) {
-          projects.push({
-            path: candidates[i].path,
-            editorName: editor.name,
-            editorBundleId: editor.bundleId,
-          });
-        }
-      }
-
-      return projects;
-    } finally {
-      db.close();
+    return paths
+      .filter((_, i) => existsResults[i])
+      .map((path) => ({ path, editorName: editor.name, editorBundleId: editor.bundleId }));
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.warn(`[RecentProjects] Failed to parse JSON from ${editor.name}`);
     }
-  } catch {
-    // Silently skip editors that fail (not installed, locked, etc.)
     return [];
+  } finally {
+    db?.close();
   }
 }
 
 /**
- * Normalize path for case-insensitive comparison on Windows/macOS.
- * Linux filesystems are case-sensitive, so no normalization is needed there.
+ * Normalize path for deduplication (case-insensitive on Windows/macOS).
  */
-function normalizePathForDedup(inputPath: string): string {
-  if (process.platform === 'win32' || process.platform === 'darwin') {
-    return inputPath.toLowerCase();
-  }
-  return inputPath;
+function normalizePathForDedup(path: string): string {
+  return process.platform === 'linux' ? path : path.toLowerCase();
 }
 
 /**
- * Internal function to fetch and deduplicate projects from all editors.
+ * Fetch and deduplicate projects from all editors.
  */
 async function fetchRecentProjects(): Promise<RecentEditorProject[]> {
-  // Read from all editors in parallel
-  const results = await Promise.all(EDITOR_CONFIGS.map((editor) => readEditorProjects(editor)));
+  const results = await Promise.all(EDITOR_CONFIGS.map(readEditorProjects));
+  const seen = new Set<string>();
 
-  const seenPaths = new Set<string>();
-  const allProjects: RecentEditorProject[] = [];
-
-  for (const projects of results) {
-    for (const project of projects) {
-      // Deduplicate across editors (case-insensitive on Windows/macOS)
-      const normalizedPath = normalizePathForDedup(project.path);
-      if (!seenPaths.has(normalizedPath)) {
-        seenPaths.add(normalizedPath);
-        allProjects.push(project);
-      }
-    }
-  }
-
-  return allProjects;
+  return results.flat().filter((project) => {
+    const key = normalizePathForDedup(project.path);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
- * Get recent projects from all supported editors.
- * Results are deduplicated by path (first occurrence wins).
- * Uses TTL cache (5 min) with stale-while-revalidate pattern.
+ * Get recent projects with TTL cache and stale-while-revalidate.
  */
 export async function getRecentProjects(): Promise<RecentEditorProject[]> {
   const now = Date.now();
   const isCacheValid = cachedProjects && now - cacheTimestamp < CACHE_TTL_MS;
 
-  // Cache hit - return immediately
-  if (isCacheValid) {
-    return cachedProjects!;
-  }
+  // Cache hit
+  if (isCacheValid) return cachedProjects!;
 
-  // Cache stale but exists - return stale data and refresh in background
-  if (cachedProjects && !refreshPromise) {
-    refreshPromise = fetchRecentProjects()
-      .then((projects) => {
-        cachedProjects = projects;
-        cacheTimestamp = Date.now();
-        return projects;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-    return cachedProjects;
-  }
+  // Already refreshing - wait for it
+  if (refreshPromise) return refreshPromise;
 
-  // No cache or already refreshing - wait for fresh data
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  // First load - fetch and cache
+  // Start refresh
   refreshPromise = fetchRecentProjects()
     .then((projects) => {
       cachedProjects = projects;
@@ -230,35 +157,6 @@ export async function getRecentProjects(): Promise<RecentEditorProject[]> {
       refreshPromise = null;
     });
 
-  return refreshPromise;
-}
-
-/**
- * Validate a local path for use as a repository.
- * Security: Only allows paths under user's home directory to prevent arbitrary path probing.
- */
-export function validateLocalPath(inputPath: string): {
-  exists: boolean;
-  isDirectory: boolean;
-} {
-  // Normalize path to prevent traversal attacks (../)
-  const normalizedPath = resolve(inputPath);
-  const home = homedir();
-  const sep = process.platform === 'win32' ? '\\' : '/';
-
-  // Security: Only allow paths under user's home directory
-  if (!normalizedPath.startsWith(home + sep) && normalizedPath !== home) {
-    return { exists: false, isDirectory: false };
-  }
-
-  if (!existsSync(normalizedPath)) {
-    return { exists: false, isDirectory: false };
-  }
-
-  try {
-    const stats = statSync(normalizedPath);
-    return { exists: true, isDirectory: stats.isDirectory() };
-  } catch {
-    return { exists: false, isDirectory: false };
-  }
+  // Return stale cache if available, otherwise wait
+  return cachedProjects ?? refreshPromise;
 }

@@ -2,7 +2,8 @@ import type { ProxySettings } from '@shared/types';
 import { IPC_CHANNELS } from '@shared/types';
 import { ipcMain } from 'electron';
 import { appDetector } from '../services/app/AppDetector';
-import { getRecentProjects, validateLocalPath } from '../services/app/RecentProjectsService';
+import { validateLocalPath } from '../services/app/PathValidator';
+import { getRecentProjects } from '../services/app/RecentProjectsService';
 import { applyProxy, testProxy } from '../services/proxy/ProxyConfig';
 
 export function registerAppHandlers() {
