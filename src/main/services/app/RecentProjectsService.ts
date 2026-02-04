@@ -6,6 +6,10 @@ import Database from 'better-sqlite3';
 
 // Cache with TTL (5 minutes)
 const CACHE_TTL_MS = 5 * 60 * 1000;
+// Limit entries per editor to balance history completeness vs memory/performance
+// 50 entries covers typical usage (~1 month of active projects for most users)
+const MAX_ENTRIES_PER_EDITOR = 50;
+
 let cachedProjects: RecentEditorProject[] | null = null;
 let cacheTimestamp = 0;
 let refreshPromise: Promise<RecentEditorProject[]> | null = null;
@@ -88,7 +92,8 @@ async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorPro
     if (!row?.value) return [];
 
     const data = JSON.parse(row.value) as { entries?: Array<{ folderUri?: unknown }> };
-    const entries = data.entries || [];
+    // Limit entries to prevent performance issues with large history
+    const entries = (data.entries || []).slice(0, MAX_ENTRIES_PER_EDITOR);
 
     // Extract valid paths from entries
     const paths = entries
@@ -103,7 +108,12 @@ async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorPro
       .map((path) => ({ path, editorName: editor.name, editorBundleId: editor.bundleId }));
   } catch (err) {
     if (err instanceof SyntaxError) {
-      console.warn(`[RecentProjects] Failed to parse JSON from ${editor.name}`);
+      console.warn(`[RecentProjects] Invalid JSON in ${editor.name} database`);
+    } else {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      console.warn(
+        `[RecentProjects] Failed to read from ${editor.name}: ${code || 'unknown error'}`
+      );
     }
     return [];
   } finally {
