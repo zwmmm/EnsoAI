@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { RecentEditorProject } from '@shared/types';
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
 
 // Cache with TTL (5 minutes)
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -76,18 +76,33 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 /**
+ * Query SQLite database asynchronously.
+ */
+function queryDatabase(dbPath: string, sql: string): Promise<{ value: string } | undefined> {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
+      if (err) return reject(err);
+      db.get(sql, (err, row: { value: string } | undefined) => {
+        db.close();
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+  });
+}
+
+/**
  * Read recent projects from an editor's state.vscdb database.
  */
 async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorProject[]> {
   const dbPath = getStoragePath(editor.configDir);
   if (!(await pathExists(dbPath))) return [];
 
-  let db: Database.Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true, timeout: 1000 });
-    const row = db
-      .prepare("SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList'")
-      .get() as { value: string } | undefined;
+    const row = await queryDatabase(
+      dbPath,
+      "SELECT value FROM ItemTable WHERE key = 'history.recentlyOpenedPathsList'"
+    );
 
     if (!row?.value) return [];
 
@@ -116,8 +131,6 @@ async function readEditorProjects(editor: EditorConfig): Promise<RecentEditorPro
       );
     }
     return [];
-  } finally {
-    db?.close();
   }
 }
 
