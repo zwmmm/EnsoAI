@@ -12,10 +12,10 @@ import { useSettingsStore } from '@/stores/settings';
 import '@xterm/xterm/css/xterm.css';
 
 // Regex to match file paths with optional line:column
-// Matches: path/to/file.ts:42 or path/to/file.ts:42:10 or ./file.ts:10
-// Note: longer extensions must come before shorter ones (tsx before ts, jsx before js, etc.)
+// Matches: path/to/file.ts:42 or path/to/file.ts:42:10 or ./file.ts:10 or @src/file.ts:42
+// Note: longer extensions must come before shorter ones (tsx before ts, jsx before js, json before js, etc.)
 const FILE_PATH_REGEX =
-  /(?:^|[\s'"({[])((?:\.{1,2}\/|\/)?(?:[\w.-]+\/)*[\w.-]+\.(?:tsx|ts|jsx|js|mjs|cjs|json|scss|css|less|html|vue|svelte|md|yaml|yml|toml|py|go|rs|java|cpp|hpp|c|h|rb|php|bash|zsh|sh))(?::(\d+))?(?::(\d+))?/g;
+  /(?:^|[\s'"({[@])((?:\.{1,2}\/|\/)?(?:[\w.-]+\/)*[\w.-]+\.(?:tsx|ts|jsx|json|mjs|cjs|js|scss|css|less|html|vue|svelte|md|yaml|yml|toml|py|go|rs|java|cpp|hpp|c|h|rb|php|bash|zsh|sh))(?::(\d+))?(?::(\d+))?/g;
 
 // Check if data contains visible characters (not just ANSI control sequences)
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require ESC character
@@ -122,6 +122,7 @@ export function useXterm({
   const terminalRef = useRef<Terminal | null>(null);
   const settings = useTerminalSettings();
   const terminalRenderer = useSettingsStore((s) => s.terminalRenderer);
+  const copyOnSelection = useSettingsStore((s) => s.copyOnSelection);
   const shellConfig = useSettingsStore((s) => s.shellConfig);
   const navigateToFile = useNavigationStore((s) => s.navigateToFile);
   const cwdRef = useRef(cwd);
@@ -133,6 +134,7 @@ export function useXterm({
   const exitCleanupRef = useRef<(() => void) | null>(null);
   const linkProviderDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const rendererAddonRef = useRef<{ dispose: () => void } | null>(null);
+  const copyOnSelectionHandlerRef = useRef<(() => void) | null>(null);
   const onExitRef = useRef(onExit);
   onExitRef.current = onExit;
   const onDataRef = useRef(onData);
@@ -149,6 +151,8 @@ export function useXterm({
   onMergeRef.current = onMerge;
   const canMergeRef = useRef(canMerge);
   canMergeRef.current = canMerge;
+  const copyOnSelectionRef = useRef(copyOnSelection);
+  copyOnSelectionRef.current = copyOnSelection;
   const hasBeenActivatedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const hasReceivedDataRef = useRef(false);
@@ -398,6 +402,23 @@ export function useXterm({
     });
     linkProviderDisposableRef.current = linkProviderDisposable;
 
+    // Copy on Selection: copy selected text to clipboard when mouse is released
+    const handleCopyOnSelection = () => {
+      if (!copyOnSelectionRef.current) return;
+      // Defer to next task so xterm finalizes the selection first
+      setTimeout(() => {
+        // Guard: terminal may have been disposed between mouseup and this callback
+        if (!terminalRef.current) return;
+        if (terminal.hasSelection()) {
+          navigator.clipboard.writeText(terminal.getSelection()).catch(() => {
+            // Ignore clipboard write failures (e.g., window not focused)
+          });
+        }
+      }, 0);
+    };
+    terminal.element?.addEventListener('mouseup', handleCopyOnSelection);
+    copyOnSelectionHandlerRef.current = handleCopyOnSelection;
+
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
@@ -610,6 +631,11 @@ export function useXterm({
       exitCleanupRef.current?.();
       if (ptyIdRef.current) {
         window.electronAPI.terminal.destroy(ptyIdRef.current);
+      }
+      // Remove copy-on-selection listener before disposing terminal
+      if (copyOnSelectionHandlerRef.current) {
+        terminalRef.current?.element?.removeEventListener('mouseup', copyOnSelectionHandlerRef.current);
+        copyOnSelectionHandlerRef.current = null;
       }
       // Dispose addons before terminal to prevent async callback errors
       linkProviderDisposableRef.current?.dispose();

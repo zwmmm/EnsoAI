@@ -5,11 +5,11 @@ import type {
   WorktreeMergeOptions,
   WorktreeMergeResult,
 } from '@shared/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { consumeClaudeProviderSwitch, isClaudeProviderMatch } from '@/lib/claudeProvider';
 import { normalizeHexColor } from '@/lib/colors';
-import { cn } from '@/lib/utils';
 import {
   ALL_GROUP_ID,
   DEFAULT_GROUP_COLOR,
@@ -18,6 +18,7 @@ import {
   type Repository,
   type RepositoryGroup,
   type TabId,
+  TEMP_REPO_ID,
 } from './App/constants';
 import {
   getActiveGroupId,
@@ -44,11 +45,13 @@ import { CloneProgressFloat } from './components/git/CloneProgressFloat';
 import { ActionPanel } from './components/layout/ActionPanel';
 import { MainContent } from './components/layout/MainContent';
 import { RepositorySidebar } from './components/layout/RepositorySidebar';
+import { TemporaryWorkspacePanel } from './components/layout/TemporaryWorkspacePanel';
 import { TreeSidebar } from './components/layout/TreeSidebar';
 import { WindowTitleBar } from './components/layout/WindowTitleBar';
 import { WorktreePanel } from './components/layout/WorktreePanel';
 import type { SettingsCategory } from './components/settings/constants';
 import { DraggableSettingsWindow } from './components/settings/DraggableSettingsWindow';
+import { TempWorkspaceDialogs } from './components/temp-workspace/TempWorkspaceDialogs';
 import { UpdateNotification } from './components/UpdateNotification';
 import { Button } from './components/ui/button';
 import {
@@ -80,15 +83,22 @@ import { useEditorStore } from './stores/editor';
 import { useInitScriptStore } from './stores/initScript';
 import { useNavigationStore } from './stores/navigation';
 import { useSettingsStore } from './stores/settings';
+import { useTempWorkspaceStore } from './stores/tempWorkspace';
 import { requestUnsavedChoice } from './stores/unsavedPrompt';
 import { useWorktreeStore } from './stores/worktree';
-import { useWorktreeActivityStore } from './stores/worktreeActivity';
+import { initAgentActivityListener, useWorktreeActivityStore } from './stores/worktreeActivity';
 
 // Initialize global clone progress listener
 initCloneProgressListener();
 
 export default function App() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
+
+  // Initialize agent activity listener for tree sidebar status display
+  useEffect(() => {
+    return initAgentActivityListener();
+  }, []);
 
   // Listen for auto-fetch completion events to refresh git status
   useAutoFetchListener();
@@ -124,6 +134,9 @@ export default function App() {
 
   // Ref for cross-repo worktree switching (defined later)
   const switchWorktreePathRef = useRef<((path: string) => void) | null>(null);
+
+  // Ref to track current worktree path for fetch race condition prevention
+  const currentWorktreePathRef = useRef<string | null>(null);
 
   // Settings page state (used in MainContent)
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>(() => {
@@ -256,6 +269,27 @@ export default function App() {
   const autoUpdateEnabled = useSettingsStore((s) => s.autoUpdateEnabled);
   const editorSettings = useSettingsStore((s) => s.editorSettings);
   const settingsDisplayMode = useSettingsStore((s) => s.settingsDisplayMode);
+  const hideGroups = useSettingsStore((s) => s.hideGroups);
+  const temporaryWorkspaceEnabled = useSettingsStore((s) => s.temporaryWorkspaceEnabled);
+  const defaultTemporaryPath = useSettingsStore((s) => s.defaultTemporaryPath);
+  const isWindows = window.electronAPI?.env.platform === 'win32';
+  const pathSep = isWindows ? '\\' : '/';
+  const homeDir = window.electronAPI?.env.HOME || '';
+  const effectiveTempBasePath = useMemo(
+    () => defaultTemporaryPath || [homeDir, 'ensoai', 'temporary'].join(pathSep),
+    [defaultTemporaryPath, homeDir, pathSep]
+  );
+  const tempBasePathDisplay = useMemo(() => {
+    if (!effectiveTempBasePath) return '';
+    let display = effectiveTempBasePath.replace(/\\/g, '/');
+    if (display.startsWith('/')) {
+      display = display.slice(1);
+    }
+    if (!display.endsWith('/')) {
+      display = `${display}/`;
+    }
+    return display;
+  }, [effectiveTempBasePath]);
 
   // Panel resize hook
   const { repositoryWidth, worktreeWidth, treeSidebarWidth, resizing, handleResizeStart } =
@@ -264,6 +298,13 @@ export default function App() {
   const worktreeError = useWorktreeStore((s) => s.error);
   const switchEditorWorktree = useEditorStore((s) => s.switchWorktree);
   const clearEditorWorktreeState = useEditorStore((s) => s.clearWorktreeState);
+  const tempWorkspaces = useTempWorkspaceStore((s) => s.items);
+  const addTempWorkspace = useTempWorkspaceStore((s) => s.addItem);
+  const removeTempWorkspace = useTempWorkspaceStore((s) => s.removeItem);
+  const renameTempWorkspace = useTempWorkspaceStore((s) => s.renameItem);
+  const rehydrateTempWorkspaces = useTempWorkspaceStore((s) => s.rehydrate);
+  const openTempRename = useTempWorkspaceStore((s) => s.openRename);
+  const openTempDelete = useTempWorkspaceStore((s) => s.openDelete);
 
   // Navigation store for terminal -> editor file navigation
   const { pendingNavigation, clearNavigation } = useNavigationStore();
@@ -363,6 +404,19 @@ export default function App() {
     window.addEventListener('open-settings-provider', handleOpenSettingsProvider);
     return () => {
       window.removeEventListener('open-settings-provider', handleOpenSettingsProvider);
+    };
+  }, [openSettings]);
+
+  // Listen for 'open-settings-agent' event from SessionBar/AgentPanel
+  useEffect(() => {
+    const handleOpenSettingsAgent = () => {
+      setSettingsCategory('agent');
+      openSettings();
+    };
+
+    window.addEventListener('open-settings-agent', handleOpenSettingsAgent);
+    return () => {
+      window.removeEventListener('open-settings-agent', handleOpenSettingsAgent);
     };
   }, [openSettings]);
 
@@ -584,6 +638,20 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.WORKTREE_COLLAPSED, String(worktreeCollapsed));
   }, [worktreeCollapsed]);
 
+  useEffect(() => {
+    if (!temporaryWorkspaceEnabled && selectedRepo === TEMP_REPO_ID) {
+      setSelectedRepo(repositories[0]?.path ?? null);
+    }
+  }, [temporaryWorkspaceEnabled, selectedRepo, repositories]);
+
+  useEffect(() => {
+    if (selectedRepo !== TEMP_REPO_ID || !activeWorktree?.path) return;
+    const exists = tempWorkspaces.some((item) => item.path === activeWorktree.path);
+    if (!exists) {
+      setActiveWorktree(null);
+    }
+  }, [selectedRepo, activeWorktree?.path, tempWorkspaces]);
+
   // Persist worktree tab map to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.WORKTREE_TABS, JSON.stringify(worktreeTabMap));
@@ -594,16 +662,19 @@ export default function App() {
     saveTabOrder(tabOrder);
   }, [tabOrder]);
 
+  const isTempRepo = selectedRepo === TEMP_REPO_ID;
+  const worktreeRepoPath = isTempRepo ? null : selectedRepo;
+
   // Get worktrees for selected repo (used in columns mode)
   const {
     data: worktrees = [],
     isLoading: worktreesLoading,
     isFetching: worktreesFetching,
     refetch,
-  } = useWorktreeList(selectedRepo);
+  } = useWorktreeList(worktreeRepoPath);
 
   // Get branches for selected repo
-  const { data: branches = [], refetch: refetchBranches } = useGitBranches(selectedRepo);
+  const { data: branches = [], refetch: refetchBranches } = useGitBranches(worktreeRepoPath);
 
   // Worktree mutations
   const createWorktreeMutation = useWorktreeCreate();
@@ -618,6 +689,7 @@ export default function App() {
 
   useEffect(() => {
     migrateRepositoryGroups();
+    rehydrateTempWorkspaces();
 
     const savedGroups = getStoredGroups();
     setGroups(savedGroups);
@@ -674,7 +746,7 @@ export default function App() {
       // Wait for worktrees to load before setting active worktree.
       setActiveWorktree({ path: savedWorktreePath } as GitWorktree);
     }
-  }, []);
+  }, [rehydrateTempWorkspaces]);
 
   const saveRepositories = useCallback((repos: Repository[]) => {
     localStorage.setItem(STORAGE_KEYS.REPOSITORIES, JSON.stringify(repos));
@@ -740,6 +812,14 @@ export default function App() {
     setActiveGroupId(groupId);
     saveActiveGroupId(groupId);
   }, []);
+
+  // Auto-switch to ALL when hideGroups is enabled
+  useEffect(() => {
+    if (hideGroups && activeGroupId !== ALL_GROUP_ID) {
+      setActiveGroupId(ALL_GROUP_ID);
+      saveActiveGroupId(ALL_GROUP_ID);
+    }
+  }, [hideGroups, activeGroupId]);
 
   const handleMoveToGroup = useCallback(
     (repoPath: string, targetGroupId: string | null) => {
@@ -916,6 +996,13 @@ export default function App() {
     window.electronAPI.mcp.setStatusLineHookEnabled(claudeCodeIntegration.statusLineEnabled);
   }, [claudeCodeIntegration.statusLineEnabled]);
 
+  // Sync PermissionRequest hook setting with Claude Code (for AskUserQuestion notifications)
+  useEffect(() => {
+    window.electronAPI.mcp.setPermissionRequestHookEnabled(
+      claudeCodeIntegration.permissionRequestHookEnabled
+    );
+  }, [claudeCodeIntegration.permissionRequestHookEnabled]);
+
   // Listen for code review continue conversation request
   const shouldSwitchToChatTab = useCodeReviewContinueStore(
     (s) => s.continueConversation.shouldSwitchToChatTab
@@ -965,8 +1052,45 @@ export default function App() {
     // Editor state will be synced by useEffect
   };
 
+  // Helper function to refresh git data for a worktree
+  const refreshGitData = useCallback(
+    (worktreePath: string) => {
+      // Update ref to track current worktree for race condition prevention
+      currentWorktreePathRef.current = worktreePath;
+
+      // Immediately refresh local git data
+      const localKeys = [
+        'status',
+        'file-changes',
+        'file-diff',
+        'log',
+        'log-infinite',
+        'submodules',
+      ];
+      for (const key of localKeys) {
+        queryClient.invalidateQueries({ queryKey: ['git', key, worktreePath] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['git', 'submodule', 'changes', worktreePath] });
+
+      // Fetch remote then refresh branch data (with race condition check)
+      window.electronAPI.git
+        .fetch(worktreePath)
+        .then(() => {
+          // Only refresh if this is still the current worktree
+          if (currentWorktreePathRef.current === worktreePath) {
+            queryClient.invalidateQueries({ queryKey: ['git', 'branches', worktreePath] });
+            queryClient.invalidateQueries({ queryKey: ['git', 'status', worktreePath] });
+          }
+        })
+        .catch(() => {
+          // Silent fail - fetch errors are not critical
+        });
+    },
+    [queryClient]
+  );
+
   const handleSelectWorktree = useCallback(
-    async (worktree: GitWorktree) => {
+    async (worktree: GitWorktree, nextRepoPath?: string) => {
       if (editorSettings.autoSave === 'off') {
         const editorState = useEditorStore.getState();
         const dirtyTabs = editorState.tabs.filter((tab) => tab.isDirty);
@@ -1009,6 +1133,10 @@ export default function App() {
         }
       }
 
+      if (nextRepoPath && nextRepoPath !== selectedRepo) {
+        setSelectedRepo(nextRepoPath);
+      }
+
       // Save current worktree's tab state before switching
       if (activeWorktree?.path) {
         setWorktreeTabMap((prev) => ({
@@ -1023,12 +1151,132 @@ export default function App() {
       // Restore the new worktree's tab state (default to 'chat')
       const savedTab = worktreeTabMap[worktree.path] || 'chat';
       setActiveTab(savedTab);
+
+      // Refresh git data for the new worktree
+      refreshGitData(worktree.path);
     },
-    [activeWorktree, activeTab, worktreeTabMap, editorSettings.autoSave, t]
+    [
+      activeWorktree,
+      activeTab,
+      worktreeTabMap,
+      editorSettings.autoSave,
+      t,
+      refreshGitData,
+      selectedRepo,
+    ]
+  );
+
+  const handleSelectTempWorkspace = useCallback(
+    async (path: string) => {
+      await handleSelectWorktree({ path } as GitWorktree, TEMP_REPO_ID);
+    },
+    [handleSelectWorktree]
+  );
+
+  const handleCreateTempWorkspace = useCallback(async () => {
+    const toastId = toastManager.add({
+      type: 'loading',
+      title: t('Creating...'),
+      description: t('Temp Session'),
+      timeout: 0,
+    });
+
+    const result = await window.electronAPI.tempWorkspace.create(effectiveTempBasePath);
+    if (!result.ok) {
+      toastManager.close(toastId);
+      toastManager.add({
+        type: 'error',
+        title: t('Create failed'),
+        description: result.message || t('Failed to create temp session'),
+      });
+      return;
+    }
+
+    addTempWorkspace(result.item);
+    toastManager.close(toastId);
+    toastManager.add({
+      type: 'success',
+      title: t('Temp Session created'),
+      description: result.item.title,
+    });
+    await handleSelectTempWorkspace(result.item.path);
+  }, [addTempWorkspace, effectiveTempBasePath, handleSelectTempWorkspace, t]);
+
+  const closeAgentSessions = useWorktreeActivityStore((s) => s.closeAgentSessions);
+  const closeTerminalSessions = useWorktreeActivityStore((s) => s.closeTerminalSessions);
+  const clearWorktreeActivity = useWorktreeActivityStore((s) => s.clearWorktree);
+
+  const handleRemoveTempWorkspace = useCallback(
+    async (id: string) => {
+      const target = tempWorkspaces.find((item) => item.id === id);
+      if (!target) return;
+
+      const toastId = toastManager.add({
+        type: 'loading',
+        title: t('Deleting...'),
+        description: target.title,
+        timeout: 0,
+      });
+
+      closeAgentSessions(target.path);
+      closeTerminalSessions(target.path);
+
+      const result = await window.electronAPI.tempWorkspace.remove(
+        target.path,
+        effectiveTempBasePath
+      );
+      if (!result.ok) {
+        toastManager.close(toastId);
+        toastManager.add({
+          type: 'error',
+          title: t('Delete failed'),
+          description: result.message || t('Failed to delete temp session'),
+        });
+        return;
+      }
+
+      removeTempWorkspace(id);
+      clearEditorWorktreeState(target.path);
+      clearWorktreeActivity(target.path);
+
+      if (activeWorktree?.path === target.path) {
+        const remaining = tempWorkspaces.filter((item) => item.id !== id);
+        if (remaining.length > 0) {
+          await handleSelectTempWorkspace(remaining[0].path);
+        } else {
+          setActiveWorktree(null);
+        }
+      }
+
+      toastManager.close(toastId);
+      toastManager.add({
+        type: 'success',
+        title: t('Temp Session deleted'),
+        description: target.title,
+      });
+    },
+    [
+      activeWorktree?.path,
+      clearEditorWorktreeState,
+      closeAgentSessions,
+      closeTerminalSessions,
+      clearWorktreeActivity,
+      handleSelectTempWorkspace,
+      removeTempWorkspace,
+      tempWorkspaces,
+      t,
+      effectiveTempBasePath,
+    ]
   );
 
   const handleSwitchWorktreePath = useCallback(
     async (worktreePath: string) => {
+      const tempMatch = tempWorkspaces.find((item) => item.path === worktreePath);
+      if (tempMatch) {
+        await handleSelectWorktree({ path: tempMatch.path } as GitWorktree, TEMP_REPO_ID);
+        return;
+      }
+
       const worktree = worktrees.find((wt) => wt.path === worktreePath);
       if (worktree) {
         handleSelectWorktree(worktree);
@@ -1044,12 +1292,15 @@ export default function App() {
             setActiveWorktree(found);
             const savedTab = worktreeTabMap[found.path] || 'chat';
             setActiveTab(savedTab);
+
+            // Refresh git data for the switched worktree
+            refreshGitData(found.path);
             return;
           }
         } catch {}
       }
     },
-    [worktrees, repositories, worktreeTabMap, handleSelectWorktree]
+    [tempWorkspaces, worktrees, repositories, worktreeTabMap, handleSelectWorktree, refreshGitData]
   );
 
   // Assign to ref for use in keyboard shortcut callback
@@ -1382,6 +1633,13 @@ export default function App() {
                   onMoveToGroup={handleMoveToGroup}
                   onSwitchTab={setActiveTab}
                   onSwitchWorktreeByPath={handleSwitchWorktreePath}
+                  temporaryWorkspaceEnabled={temporaryWorkspaceEnabled}
+                  tempWorkspaces={tempWorkspaces}
+                  tempBasePath={tempBasePathDisplay}
+                  onSelectTempWorkspace={handleSelectTempWorkspace}
+                  onCreateTempWorkspace={handleCreateTempWorkspace}
+                  onRequestTempRename={openTempRename}
+                  onRequestTempDelete={openTempDelete}
                   toggleSelectedRepoExpandedRef={toggleSelectedRepoExpandedRef}
                   isSettingsActive={activeTab === 'settings'}
                   onToggleSettings={toggleSettings}
@@ -1432,6 +1690,8 @@ export default function App() {
                     isSettingsActive={activeTab === 'settings'}
                     onToggleSettings={toggleSettings}
                     isFileDragOver={isFileDragOver}
+                    temporaryWorkspaceEnabled={temporaryWorkspaceEnabled}
+                    tempBasePath={tempBasePathDisplay}
                   />
                   {/* Resize handle */}
                   <div
@@ -1453,30 +1713,43 @@ export default function App() {
                   transition={panelTransition}
                   className="relative h-full shrink-0 overflow-hidden"
                 >
-                  <WorktreePanel
-                    worktrees={sortedWorktrees}
-                    activeWorktree={activeWorktree}
-                    branches={branches}
-                    projectName={selectedRepo?.split(/[\\/]/).pop() || ''}
-                    isLoading={worktreesLoading}
-                    isCreating={createWorktreeMutation.isPending}
-                    error={worktreeError}
-                    onSelectWorktree={handleSelectWorktree}
-                    onCreateWorktree={handleCreateWorktree}
-                    onRemoveWorktree={handleRemoveWorktree}
-                    onMergeWorktree={handleOpenMergeDialog}
-                    onReorderWorktrees={handleReorderWorktrees}
-                    onInitGit={handleInitGit}
-                    onRefresh={() => {
-                      refetch();
-                      refetchBranches();
-                    }}
-                    width={worktreeWidth}
-                    collapsed={false}
-                    onCollapse={() => setWorktreeCollapsed(true)}
-                    repositoryCollapsed={repositoryCollapsed}
-                    onExpandRepository={() => setRepositoryCollapsed(false)}
-                  />
+                  {isTempRepo ? (
+                    <TemporaryWorkspacePanel
+                      items={tempWorkspaces}
+                      activePath={activeWorktree?.path ?? null}
+                      onSelect={(item) => handleSelectTempWorkspace(item.path)}
+                      onCreate={handleCreateTempWorkspace}
+                      onRequestRename={(id) => openTempRename(id)}
+                      onRequestDelete={(id) => openTempDelete(id)}
+                      onRefresh={rehydrateTempWorkspaces}
+                      onCollapse={() => setWorktreeCollapsed(true)}
+                    />
+                  ) : (
+                    <WorktreePanel
+                      worktrees={sortedWorktrees}
+                      activeWorktree={activeWorktree}
+                      branches={branches}
+                      projectName={selectedRepo?.split(/[\\/]/).pop() || ''}
+                      isLoading={worktreesLoading}
+                      isCreating={createWorktreeMutation.isPending}
+                      error={worktreeError}
+                      onSelectWorktree={handleSelectWorktree}
+                      onCreateWorktree={handleCreateWorktree}
+                      onRemoveWorktree={handleRemoveWorktree}
+                      onMergeWorktree={handleOpenMergeDialog}
+                      onReorderWorktrees={handleReorderWorktrees}
+                      onInitGit={handleInitGit}
+                      onRefresh={() => {
+                        refetch();
+                        refetchBranches();
+                      }}
+                      width={worktreeWidth}
+                      collapsed={false}
+                      onCollapse={() => setWorktreeCollapsed(true)}
+                      repositoryCollapsed={repositoryCollapsed}
+                      onExpandRepository={() => setRepositoryCollapsed(false)}
+                    />
+                  )}
                   {/* Resize handle */}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
@@ -1515,6 +1788,11 @@ export default function App() {
           onCategoryChange={handleSettingsCategoryChange}
           scrollToProvider={scrollToProvider}
           onToggleSettings={toggleSettings}
+        />
+
+        <TempWorkspaceDialogs
+          onConfirmDelete={handleRemoveTempWorkspace}
+          onConfirmRename={renameTempWorkspace}
         />
 
         {/* Add Repository Dialog */}

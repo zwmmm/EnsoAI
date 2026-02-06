@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enso Web Inspector
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.7
 // @description  选中页面元素并发送到 Enso，具备现代化的 UI 界面
 // @author       Enso
 // @match        *://*/*
@@ -11,6 +11,8 @@
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @connect      127.0.0.1
+// @updateURL    https://raw.githubusercontent.com/J3n5en/EnsoAI/main/scripts/web-inspector.user.js
+// @downloadURL  https://raw.githubusercontent.com/J3n5en/EnsoAI/main/scripts/web-inspector.user.js
 // ==/UserScript==
 
 (() => {
@@ -43,6 +45,9 @@
         style: null,
       };
       this.menuCommandId = null;
+      this.toggleMenuCommandId = null;
+      this.resetMenuCommandId = null;
+      this.shortcutMenuId = null;
       this.dragOffset = { x: 0, y: 0 };
 
       this.init();
@@ -128,6 +133,67 @@
           display: flex; align-items: center; gap: 8px;
         }
         .enso-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .enso-shortcut-dialog {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+          z-index: 2147483647; display: flex;
+          align-items: center; justify-content: center;
+        }
+        .enso-shortcut-box {
+          background: white; border-radius: 16px; padding: 28px 32px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+          text-align: center; min-width: 340px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .enso-shortcut-box h3 {
+          margin: 0 0 16px; font-size: 16px; color: #1F2937;
+        }
+        .enso-shortcut-box p {
+          margin: 0 0 16px; font-size: 13px; color: #6B7280;
+        }
+        .enso-shortcut-tabs {
+          display: flex; gap: 0; margin-bottom: 20px;
+          border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden;
+        }
+        .enso-shortcut-tab {
+          flex: 1; padding: 8px 12px; font-size: 13px; font-weight: 500;
+          border: none; cursor: pointer; transition: all 0.2s;
+          background: #F9FAFB; color: #6B7280;
+        }
+        .enso-shortcut-tab + .enso-shortcut-tab { border-left: 1px solid #E5E7EB; }
+        .enso-shortcut-tab.active {
+          background: ${CONFIG.THEME.PRIMARY}; color: white;
+        }
+        .enso-shortcut-kbd {
+          display: inline-block; padding: 12px 24px;
+          background: #F3F4F6; border: 2px dashed #D1D5DB;
+          border-radius: 12px; font-size: 18px; font-weight: 600;
+          color: ${CONFIG.THEME.PRIMARY}; min-width: 120px;
+          font-family: 'SF Mono', SFMono-Regular, ui-monospace, monospace;
+          transition: all 0.2s;
+        }
+        .enso-shortcut-kbd.recording {
+          border-color: ${CONFIG.THEME.PRIMARY};
+          background: rgba(79, 70, 229, 0.05);
+        }
+        .enso-shortcut-actions {
+          margin-top: 20px; display: flex; gap: 8px; justify-content: center;
+        }
+        .enso-shortcut-actions button {
+          padding: 8px 20px; border-radius: 8px; border: none;
+          font-size: 13px; font-weight: 500; cursor: pointer;
+          transition: all 0.2s;
+        }
+        .enso-shortcut-actions .cancel {
+          background: #F3F4F6; color: #374151;
+        }
+        .enso-shortcut-actions .confirm {
+          background: ${CONFIG.THEME.PRIMARY}; color: white;
+        }
+        .enso-shortcut-actions .confirm:disabled {
+          opacity: 0.4; cursor: not-allowed;
+        }
       `;
       document.head.appendChild(style);
       this.elements.style = style;
@@ -139,7 +205,8 @@
       const btn = document.createElement('div');
       btn.className = 'enso-fab';
       btn.innerHTML = CONFIG.ICONS.TARGET;
-      btn.title = '开启元素选择 (可拖动)';
+      const shortcuts = this.getShortcuts();
+      btn.title = `开启元素选择 (可拖动) | ${this.formatShortcut(shortcuts.toggle)} 切换 | ${this.formatShortcut(shortcuts.reset)} 复位`;
 
       // 恢复保存的位置
       const savedPos = GM_getValue('btnPosition', null);
@@ -231,7 +298,171 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && this.isActive) this.toggleMode();
+        const shortcuts = this.getShortcuts();
+        if (this.matchShortcut(e, shortcuts.toggle)) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.toggleMode();
+        }
+        if (this.matchShortcut(e, shortcuts.reset)) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.resetPosition();
+        }
       });
+    }
+
+    resetPosition() {
+      const { btn } = this.elements;
+      if (!btn) return;
+      GM_setValue('btnPosition', null);
+      btn.style.left = '';
+      btn.style.top = '';
+      btn.style.right = '24px';
+      btn.style.bottom = '24px';
+      this.showToast('🔄 按钮已复位', 'info');
+    }
+
+    // --- Shortcut Management ---
+    static DEFAULT_SHORTCUTS = {
+      toggle: { altKey: true, shiftKey: true, ctrlKey: false, metaKey: false, code: 'KeyE' },
+      reset: { altKey: true, shiftKey: true, ctrlKey: false, metaKey: false, code: 'KeyR' },
+    };
+
+    static SHORTCUT_LABELS = { toggle: '切换元素选择', reset: '复位按钮位置' };
+
+    getShortcuts() {
+      return GM_getValue('shortcuts', EnsoInspector.DEFAULT_SHORTCUTS);
+    }
+
+    saveShortcut(name, shortcut) {
+      const shortcuts = this.getShortcuts();
+      shortcuts[name] = shortcut;
+      GM_setValue('shortcuts', shortcuts);
+    }
+
+    matchShortcut(e, shortcut) {
+      return (
+        e.altKey === shortcut.altKey &&
+        e.shiftKey === shortcut.shiftKey &&
+        e.ctrlKey === shortcut.ctrlKey &&
+        e.metaKey === shortcut.metaKey &&
+        e.code === shortcut.code
+      );
+    }
+
+    formatShortcut(shortcut) {
+      const parts = [];
+      if (shortcut.ctrlKey) parts.push('⌃');
+      if (shortcut.altKey) parts.push('⌥');
+      if (shortcut.shiftKey) parts.push('⇧');
+      if (shortcut.metaKey) parts.push('⌘');
+      const keyMap = {
+        Backquote: '`',
+        Minus: '-',
+        Equal: '=',
+        BracketLeft: '[',
+        BracketRight: ']',
+        Backslash: '\\',
+        Semicolon: ';',
+        Quote: "'",
+        Comma: ',',
+        Period: '.',
+        Slash: '/',
+      };
+      const code = shortcut.code;
+      if (code.startsWith('Key')) parts.push(code.slice(3));
+      else if (code.startsWith('Digit')) parts.push(code.slice(5));
+      else parts.push(keyMap[code] || code.replace('Arrow', ''));
+      return parts.join('');
+    }
+
+    showShortcutDialog() {
+      const names = Object.keys(EnsoInspector.SHORTCUT_LABELS);
+      const shortcuts = this.getShortcuts();
+      // Per-tab pending state
+      const pendings = {};
+
+      const dialog = document.createElement('div');
+      dialog.className = 'enso-shortcut-dialog';
+      dialog.innerHTML = `
+        <div class="enso-shortcut-box">
+          <h3>快捷键设置</h3>
+          <div class="enso-shortcut-tabs">
+            ${names.map((n, i) => `<button class="enso-shortcut-tab${i === 0 ? ' active' : ''}" data-name="${n}">${EnsoInspector.SHORTCUT_LABELS[n]}</button>`).join('')}
+          </div>
+          <p>请按下新的快捷键组合（需包含修饰键）</p>
+          <div class="enso-shortcut-kbd">${this.formatShortcut(shortcuts[names[0]])}</div>
+          <div class="enso-shortcut-actions">
+            <button class="cancel">取消</button>
+            <button class="confirm" disabled>保存</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(dialog);
+
+      const kbd = dialog.querySelector('.enso-shortcut-kbd');
+      const confirmBtn = dialog.querySelector('.confirm');
+      const cancelBtn = dialog.querySelector('.cancel');
+      const tabs = dialog.querySelectorAll('.enso-shortcut-tab');
+      let activeName = names[0];
+
+      const switchTab = (name) => {
+        activeName = name;
+        for (const t of tabs) {
+          t.classList.toggle('active', t.dataset.name === name);
+        }
+        const display = pendings[name] || shortcuts[name];
+        kbd.textContent = this.formatShortcut(display);
+        kbd.classList.toggle('recording', !!pendings[name]);
+        confirmBtn.disabled = !Object.keys(pendings).length;
+      };
+
+      for (const t of tabs) {
+        t.addEventListener('click', () => switchTab(t.dataset.name));
+      }
+
+      const onKeyDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (['Alt', 'Shift', 'Control', 'Meta'].includes(e.key)) return;
+        if (!e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) return;
+        const shortcut = {
+          altKey: e.altKey,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          code: e.code,
+        };
+        pendings[activeName] = shortcut;
+        kbd.textContent = this.formatShortcut(shortcut);
+        kbd.classList.add('recording');
+        confirmBtn.disabled = false;
+      };
+
+      const cleanup = () => {
+        document.removeEventListener('keydown', onKeyDown, true);
+        dialog.remove();
+      };
+
+      confirmBtn.addEventListener('click', () => {
+        const changed = [];
+        for (const [name, shortcut] of Object.entries(pendings)) {
+          this.saveShortcut(name, shortcut);
+          changed.push(`${EnsoInspector.SHORTCUT_LABELS[name]}: ${this.formatShortcut(shortcut)}`);
+        }
+        if (changed.length) {
+          this.showToast(`✅ ${changed.join('，')}`);
+          this.updateMenuCommand();
+        }
+        cleanup();
+      });
+      cancelBtn.addEventListener('click', cleanup);
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) cleanup();
+      });
+
+      document.addEventListener('keydown', onKeyDown, true);
     }
 
     // --- Core Logic ---
@@ -422,7 +653,12 @@
 
     updateMenuCommand() {
       if (this.menuCommandId !== null) GM_unregisterMenuCommand(this.menuCommandId);
+      if (this.toggleMenuCommandId !== null) GM_unregisterMenuCommand(this.toggleMenuCommandId);
+      if (this.resetMenuCommandId !== null) GM_unregisterMenuCommand(this.resetMenuCommandId);
+      if (this.shortcutMenuId !== null) GM_unregisterMenuCommand(this.shortcutMenuId);
+
       const isEnabled = this.isEnabledForSite();
+      const shortcuts = this.getShortcuts();
       const label = isEnabled ? `关闭 Enso Web Inspector` : `开启 Enso Web Inspector`;
       this.menuCommandId = GM_registerMenuCommand(label, () => {
         if (isEnabled) {
@@ -436,6 +672,23 @@
         }
         this.updateMenuCommand();
       });
+      if (isEnabled) {
+        const toggleKey = this.formatShortcut(shortcuts.toggle);
+        const resetKey = this.formatShortcut(shortcuts.reset);
+        const toggleLabel = this.isActive
+          ? `关闭元素选择 (${toggleKey})`
+          : `开启元素选择 (${toggleKey})`;
+        this.toggleMenuCommandId = GM_registerMenuCommand(toggleLabel, () => {
+          this.toggleMode();
+          this.updateMenuCommand();
+        });
+        this.resetMenuCommandId = GM_registerMenuCommand(`复位按钮位置 (${resetKey})`, () => {
+          this.resetPosition();
+        });
+        this.shortcutMenuId = GM_registerMenuCommand('⌨️ 快捷键设置', () => {
+          this.showShortcutDialog();
+        });
+      }
     }
   }
 

@@ -1,7 +1,15 @@
 import { LayoutGroup, motion } from 'framer-motion';
-import { FolderGit2, FolderMinus, PanelLeftClose, Plus, Search, Settings2 } from 'lucide-react';
+import {
+  Clock,
+  FolderGit2,
+  FolderMinus,
+  PanelLeftClose,
+  Plus,
+  Search,
+  Settings2,
+} from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ALL_GROUP_ID, type RepositoryGroup, type TabId } from '@/App/constants';
+import { ALL_GROUP_ID, type RepositoryGroup, type TabId, TEMP_REPO_ID } from '@/App/constants';
 import {
   CreateGroupDialog,
   GroupEditDialog,
@@ -63,6 +71,8 @@ interface RepositorySidebarProps {
   onSwitchWorktreeByPath?: (path: string) => Promise<void> | void;
   /** Whether a file is being dragged over the sidebar (from App.tsx global handler) */
   isFileDragOver?: boolean;
+  temporaryWorkspaceEnabled?: boolean;
+  tempBasePath?: string;
 }
 
 export function RepositorySidebar({
@@ -87,9 +97,12 @@ export function RepositorySidebar({
   onSwitchTab,
   onSwitchWorktreeByPath,
   isFileDragOver,
+  temporaryWorkspaceEnabled = false,
+  tempBasePath = '',
 }: RepositorySidebarProps) {
   const { t, tNode } = useI18n();
   const _settingsDisplayMode = useSettingsStore((s) => s.settingsDisplayMode);
+  const hideGroups = useSettingsStore((s) => s.hideGroups);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -235,16 +248,18 @@ export function RepositorySidebar({
         )}
       </div>
 
-      {/* Group Selector */}
-      <GroupSelector
-        groups={groups}
-        activeGroupId={activeGroupId}
-        repositoryCounts={repositoryCounts}
-        totalCount={repositories.length}
-        onSelectGroup={onSwitchGroup}
-        onEditGroup={() => setEditGroupDialogOpen(true)}
-        onAddGroup={() => setCreateGroupDialogOpen(true)}
-      />
+      {/* Group Selector - only show when groups are not hidden */}
+      {!hideGroups && (
+        <GroupSelector
+          groups={groups}
+          activeGroupId={activeGroupId}
+          repositoryCounts={repositoryCounts}
+          totalCount={repositories.length}
+          onSelectGroup={onSwitchGroup}
+          onEditGroup={() => setEditGroupDialogOpen(true)}
+          onAddGroup={() => setCreateGroupDialogOpen(true)}
+        />
+      )}
 
       {/* Search */}
       <div className="px-3 py-2">
@@ -262,6 +277,35 @@ export function RepositorySidebar({
 
       {/* Repository List */}
       <div className="flex-1 overflow-auto p-2">
+        {temporaryWorkspaceEnabled && (
+          <div className="mb-2">
+            <RepoItemWithGlow repoPath={TEMP_REPO_ID}>
+              <button
+                type="button"
+                onClick={() => onSelectRepo(TEMP_REPO_ID)}
+                className={cn(
+                  'group relative flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors',
+                  selectedRepo === TEMP_REPO_ID ? 'text-accent-foreground' : 'hover:bg-accent/50'
+                )}
+              >
+                {selectedRepo === TEMP_REPO_ID && (
+                  <motion.div
+                    layoutId="repo-sidebar-temp-highlight"
+                    className="absolute inset-0 rounded-lg bg-accent"
+                    transition={springFast}
+                  />
+                )}
+                <div className="relative z-10 flex w-full items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate font-medium">{t('Temp Session')}</span>
+                </div>
+                <span className="relative z-10 pl-6 text-xs text-muted-foreground">
+                  {tempBasePath || t('Quick scratch sessions')}
+                </span>
+              </button>
+            </RepoItemWithGlow>
+          </div>
+        )}
         {filteredRepos.length === 0 && searchQuery.length > 0 ? (
           <Empty className="h-full border-0">
             <EmptyMedia variant="icon">
@@ -346,8 +390,8 @@ export function RepositorySidebar({
                         />
                         <span className="truncate font-medium flex-1">{repo.name}</span>
 
-                        {/* Group Tag - 移到这里 */}
-                        {group && (
+                        {/* Group Tag - only show when groups are not hidden */}
+                        {!hideGroups && group && (
                           <span
                             className="shrink-0 inline-flex h-5 items-center gap-1 rounded-md border px-1.5 text-[10px] text-foreground/80"
                             style={{
@@ -445,7 +489,8 @@ export function RepositorySidebar({
             className="fixed z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg"
             style={{ left: menuPosition.x, top: menuPosition.y }}
           >
-            {onMoveToGroup && groups.length > 0 && (
+            {/* Move to Group - only show when groups are not hidden */}
+            {!hideGroups && onMoveToGroup && groups.length > 0 && (
               <MoveToGroupSubmenu
                 groups={groups}
                 currentGroupId={menuRepo?.groupId}
@@ -458,7 +503,9 @@ export function RepositorySidebar({
               />
             )}
 
-            {onMoveToGroup && groups.length > 0 && <div className="my-1 h-px bg-border" />}
+            {!hideGroups && onMoveToGroup && groups.length > 0 && (
+              <div className="my-1 h-px bg-border" />
+            )}
 
             <button
               type="button"
