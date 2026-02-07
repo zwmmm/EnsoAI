@@ -308,11 +308,11 @@ export function ActionPanel({
             label:
               cliInstall.isPending || cliUninstall.isPending
                 ? cliStatus?.installed
-                  ? '正在卸载...'
-                  : '正在安装...'
+                  ? t('Uninstalling...')
+                  : t('Installing...')
                 : cliStatus?.installed
-                  ? "卸载 'enso' 命令"
-                  : "安装 'enso' 命令到 PATH",
+                  ? t("Uninstall 'enso' command")
+                  : t("Install 'enso' command to PATH"),
             icon: cliInstall.isPending || cliUninstall.isPending ? Loader2 : Terminal,
             loading: cliInstall.isPending || cliUninstall.isPending,
             disabled: cliInstall.isPending || cliUninstall.isPending,
@@ -336,10 +336,10 @@ export function ActionPanel({
       const switchableRepos = repositories.filter((repo) => repo.path !== selectedRepoPath);
       if (switchableRepos.length > 0) {
         groups.push({
-          label: '切换仓库',
+          label: t('Switch repository'),
           items: switchableRepos.map((repo) => ({
             id: `switch-repo-${repo.path}`,
-            label: `切换到 ${repo.name}`,
+            label: t('Switch to {{name}}', { name: repo.name }),
             icon: FolderOpen,
             action: () => {
               onSwitchRepo(repo.path);
@@ -354,10 +354,10 @@ export function ActionPanel({
       const switchableWorktrees = worktrees.filter((wt) => wt.path !== activeWorktreePath);
       if (switchableWorktrees.length > 0) {
         groups.push({
-          label: '切换 Worktree',
+          label: t('Switch Worktree'),
           items: switchableWorktrees.map((wt) => ({
             id: `switch-worktree-${wt.path}`,
-            label: `切换到 ${wt.branch || wt.path.split('/').pop()}`,
+            label: t('Switch to {{name}}', { name: wt.branch || wt.path.split('/').pop() || '' }),
             icon: GitBranch,
             action: () => {
               onSwitchWorktree(wt);
@@ -396,7 +396,7 @@ export function ActionPanel({
 
       if (recentItems.length > 0) {
         groups.unshift({
-          label: '最近',
+          label: t('Recent'),
           items: recentItems,
         });
       }

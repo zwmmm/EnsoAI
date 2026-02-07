@@ -487,6 +487,16 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.CLI_UNINSTALL),
   },
 
+  // Tmux
+  tmux: {
+    check: (
+      forceRefresh?: boolean
+    ): Promise<{ installed: boolean; version?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TMUX_CHECK, forceRefresh),
+    killSession: (name: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TMUX_KILL_SESSION, name),
+  },
+
   // Settings
   settings: {
     read: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ),

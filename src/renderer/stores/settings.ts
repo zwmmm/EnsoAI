@@ -254,6 +254,7 @@ export interface ClaudeCodeIntegrationSettings {
   permissionRequestHookEnabled: boolean; // Enable PermissionRequest hook for AskUserQuestion notifications
   statusLineEnabled: boolean; // Enable Status Line hook for displaying agent status
   statusLineFields: StatusLineFieldSettings; // Which fields to display in status line
+  tmuxEnabled: boolean; // Enable tmux session wrapping for persistent terminal sessions
   showProviderSwitcher: boolean; // Show provider switcher in SessionBar
   enableProviderDisableFeature: boolean; // Enable/disable the provider temporary disable feature
   providers: import('@shared/types').ClaudeProvider[];
@@ -267,6 +268,7 @@ export const defaultClaudeCodeIntegrationSettings: ClaudeCodeIntegrationSettings
   permissionRequestHookEnabled: true, // Enable PermissionRequest hook for AskUserQuestion notifications
   statusLineEnabled: false, // Disable Status Line hook by default
   statusLineFields: defaultStatusLineFieldSettings,
+  tmuxEnabled: false, // Disable tmux wrapping by default
   showProviderSwitcher: true,
   enableProviderDisableFeature: false,
   providers: [],

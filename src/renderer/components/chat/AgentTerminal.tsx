@@ -108,6 +108,7 @@ export function AgentTerminal({
   const pendingIdleMonitorRef = useRef(false); // Pending idle monitor; enabled after Enter.
   const dataSinceEnterRef = useRef(0); // Track output volume since last Enter.
   const currentTitleRef = useRef<string>(''); // Terminal title from OSC escape sequence.
+  const tmuxSessionNameRef = useRef<string | null>(null); // Tmux session name for cleanup.
 
   // Output state tracking for global store
   const outputStateRef = useRef<OutputState>('idle');
@@ -238,6 +239,15 @@ export function AgentTerminal({
     };
   }, [terminalSessionId, clearRuntimeState, stopActivityPolling]);
 
+  // Cleanup tmux session on unmount
+  useEffect(() => {
+    return () => {
+      if (tmuxSessionNameRef.current) {
+        window.electronAPI.tmux.killSession(tmuxSessionNameRef.current);
+      }
+    };
+  }, []);
+
   // Build command with session args
   const { command, env } = useMemo(() => {
     // Wait for shell config to be resolved
@@ -248,15 +258,20 @@ export function AgentTerminal({
     // Use custom path if provided, otherwise use agentCommand
     const effectiveCommand = customPath || agentCommand;
 
-    const supportsSession = agentCommand?.startsWith('claude') ?? false;
-    const supportIde = agentCommand?.startsWith('claude') ?? false;
+    const supportsSession = agentCommand?.startsWith('claude') || agentCommand === 'cursor-agent';
+    // Only Claude CLI supports --ide; Cursor CLI does not (errors with "unknown option '--ide'")
+    const supportIde = agentCommand?.startsWith('claude');
     const effectiveSessionId = resumeSessionId;
-    const agentArgs =
-      supportsSession && effectiveSessionId
-        ? initialized
-          ? ['--resume', effectiveSessionId]
-          : ['--session-id', effectiveSessionId]
-        : [];
+
+    // Build agent args: cursor-agent and initialized claude use --resume; otherwise --session-id
+    let agentArgs: string[] = [];
+    if (supportsSession && effectiveSessionId) {
+      if (agentCommand === 'cursor-agent' || initialized) {
+        agentArgs = ['--resume', effectiveSessionId];
+      } else {
+        agentArgs = ['--session-id', effectiveSessionId];
+      }
+    }
 
     if (supportIde) {
       agentArgs.push('--ide');
@@ -315,11 +330,29 @@ export function AgentTerminal({
     const fullCommand = `${effectiveCommand} ${agentArgs.join(' ')}`.trim();
     const shellName = resolvedShell.shell.toLowerCase();
 
+    // Determine if tmux wrapping should be applied
+    const isClaude = agentCommand?.startsWith('claude') ?? false;
+    const shouldUseTmux = claudeCodeIntegration.tmuxEnabled && isClaude && !isWindows;
+
+    // Build tmux session name from terminal session ID
+    const tmuxSessionName =
+      shouldUseTmux && terminalSessionId
+        ? `enso-${terminalSessionId}`.replace(/[^a-zA-Z0-9_-]/g, '_')
+        : null;
+    tmuxSessionNameRef.current = tmuxSessionName;
+
+    // Wrap command in tmux if enabled
+    let finalCommand = fullCommand;
+    if (tmuxSessionName) {
+      const escaped = fullCommand.replace(/'/g, "'\\''");
+      finalCommand = `env -u TMUX tmux -L enso -f /dev/null new-session -A -s ${tmuxSessionName} '${escaped}'`;
+    }
+
     // WSL: detect from shell name (wsl.exe)
     if (shellName.includes('wsl') && isWindows) {
       // Use -e to run command directly, sh -lc loads login profile
       // exec $SHELL replaces with user's shell (zsh/bash/etc.)
-      const escapedCommand = fullCommand.replace(/"/g, '\\"');
+      const escapedCommand = finalCommand.replace(/"/g, '\\"');
       return {
         command: {
           shell: 'wsl.exe',
@@ -335,7 +368,7 @@ export function AgentTerminal({
       return {
         command: {
           shell: resolvedShell.shell,
-          args: [...resolvedShell.execArgs, `& { ${fullCommand} }`],
+          args: [...resolvedShell.execArgs, `& { ${finalCommand} }`],
         },
         env: envVars,
       };
@@ -345,7 +378,7 @@ export function AgentTerminal({
     return {
       command: {
         shell: resolvedShell.shell,
-        args: [...resolvedShell.execArgs, fullCommand],
+        args: [...resolvedShell.execArgs, finalCommand],
       },
       env: envVars,
     };
@@ -359,6 +392,8 @@ export function AgentTerminal({
     hapiSettings.cliApiToken,
     hapiGlobalInstalled,
     resolvedShell,
+    claudeCodeIntegration.tmuxEnabled,
+    terminalSessionId,
   ]);
 
   // Handle exit with auto-close logic
