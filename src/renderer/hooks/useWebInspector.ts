@@ -18,7 +18,8 @@ function formatInspectData(data: InspectPayload): string {
   // Add component source info if available
   if (data.component) {
     const { framework, file, line, column } = data.component;
-    const location = line !== undefined ? `:${line}${column !== undefined ? `:${column}` : ''}` : '';
+    const location =
+      line !== undefined ? `:${line}${column !== undefined ? `:${column}` : ''}` : '';
     lines.push(`Component: [${framework}] ${file}${location}`);
   }
 

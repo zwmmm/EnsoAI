@@ -6,7 +6,6 @@ import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings';
 
-
 interface CommitBoxProps {
   stagedCount: number;
   onCommit: (message: string) => void;
@@ -82,7 +81,7 @@ export function CommitBox({
   const canGenerate = commitMessageGenerator.enabled && rootPath && !isGenerating && !isCommitting;
 
   return (
-    <div className={cn("flex shrink-0 flex-col border-t", !bgImageEnabled && "bg-background")}>
+    <div className={cn('flex shrink-0 flex-col border-t', !bgImageEnabled && 'bg-background')}>
       {/* Message Input with Generate Button */}
       <div className="relative">
         <textarea

@@ -11,47 +11,38 @@ import {
   Sparkles,
   Sun,
   Terminal,
-} from "lucide-react";
-import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from 'lucide-react';
+import * as React from 'react';
+import { dispatchBackgroundRefresh } from '@/components/layout/BackgroundLayer';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Combobox,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
   ComboboxPopup,
-} from "@/components/ui/combobox";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/combobox';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectItem,
   SelectPopup,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-
-import { Switch } from "@/components/ui/switch";
-import { dispatchBackgroundRefresh } from "@/components/layout/BackgroundLayer";
-import { useI18n } from "@/i18n";
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { useI18n } from '@/i18n';
 import {
   defaultDarkTheme,
   getThemeNames,
   getXtermTheme,
   type XtermTheme,
-} from "@/lib/ghosttyTheme";
-import { cn } from "@/lib/utils";
-import {
-  type FontWeight,
-  type Theme,
-  useSettingsStore,
-} from "@/stores/settings";
-import { fontWeightOptions } from "./constants";
+} from '@/lib/ghosttyTheme';
+import { cn } from '@/lib/utils';
+import { type FontWeight, type Theme, useSettingsStore } from '@/stores/settings';
+import { fontWeightOptions } from './constants';
 
 function TerminalPreview({
   theme,
@@ -65,25 +56,25 @@ function TerminalPreview({
   fontWeight: string;
 }) {
   const sampleLines = [
-    { id: "prompt1", text: "$ ", color: theme.green },
-    { id: "cmd1", text: "ls -la", color: theme.foreground },
-    { id: "nl1", text: "\n" },
-    { id: "perm1", text: "drwxr-xr-x  ", color: theme.blue },
-    { id: "meta1", text: "5 user staff  160 Dec 23 ", color: theme.foreground },
-    { id: "dir1", text: "Documents", color: theme.cyan },
-    { id: "nl2", text: "\n" },
-    { id: "perm2", text: "-rw-r--r--  ", color: theme.foreground },
-    { id: "meta2", text: "1 user staff 2048 Dec 22 ", color: theme.foreground },
-    { id: "file1", text: "config.json", color: theme.yellow },
-    { id: "nl3", text: "\n" },
-    { id: "perm3", text: "-rwxr-xr-x  ", color: theme.foreground },
-    { id: "meta3", text: "1 user staff  512 Dec 21 ", color: theme.foreground },
-    { id: "file2", text: "script.sh", color: theme.green },
-    { id: "nl4", text: "\n\n" },
-    { id: "prompt2", text: "$ ", color: theme.green },
-    { id: "cmd2", text: 'echo "Hello, World!"', color: theme.foreground },
-    { id: "nl5", text: "\n" },
-    { id: "output1", text: "Hello, World!", color: theme.magenta },
+    { id: 'prompt1', text: '$ ', color: theme.green },
+    { id: 'cmd1', text: 'ls -la', color: theme.foreground },
+    { id: 'nl1', text: '\n' },
+    { id: 'perm1', text: 'drwxr-xr-x  ', color: theme.blue },
+    { id: 'meta1', text: '5 user staff  160 Dec 23 ', color: theme.foreground },
+    { id: 'dir1', text: 'Documents', color: theme.cyan },
+    { id: 'nl2', text: '\n' },
+    { id: 'perm2', text: '-rw-r--r--  ', color: theme.foreground },
+    { id: 'meta2', text: '1 user staff 2048 Dec 22 ', color: theme.foreground },
+    { id: 'file1', text: 'config.json', color: theme.yellow },
+    { id: 'nl3', text: '\n' },
+    { id: 'perm3', text: '-rwxr-xr-x  ', color: theme.foreground },
+    { id: 'meta3', text: '1 user staff  512 Dec 21 ', color: theme.foreground },
+    { id: 'file2', text: 'script.sh', color: theme.green },
+    { id: 'nl4', text: '\n\n' },
+    { id: 'prompt2', text: '$ ', color: theme.green },
+    { id: 'cmd2', text: 'echo "Hello, World!"', color: theme.foreground },
+    { id: 'nl5', text: '\n' },
+    { id: 'output1', text: 'Hello, World!', color: theme.magenta },
   ];
 
   return (
@@ -97,9 +88,9 @@ function TerminalPreview({
       }}
     >
       {sampleLines.map((segment) =>
-        segment.text === "\n" ? (
+        segment.text === '\n' ? (
           <br key={segment.id} />
-        ) : segment.text === "\n\n" ? (
+        ) : segment.text === '\n\n' ? (
           <React.Fragment key={segment.id}>
             <br />
             <br />
@@ -108,7 +99,7 @@ function TerminalPreview({
           <span key={segment.id} style={{ color: segment.color }}>
             {segment.text}
           </span>
-        ),
+        )
       )}
       <span
         className="inline-block w-2 h-4 animate-pulse"
@@ -139,7 +130,7 @@ function FavoriteButton({
         e.preventDefault();
         onClick(e);
       }}
-      className={cn("p-1 hover:text-red-500 transition-colors", className)}
+      className={cn('p-1 hover:text-red-500 transition-colors', className)}
     >
       {isFavorite ? (
         <Heart className="h-4 w-4 fill-red-500 text-red-500" />
@@ -176,18 +167,13 @@ function ThemeCombobox({
   const [internalValue, setInternalValue] = React.useState(value);
   const [search, setSearch] = React.useState(value);
   const [isOpen, setIsOpen] = React.useState(false);
-  const hoverTimeoutRef = React.useRef<
-    ReturnType<typeof setTimeout> | undefined
-  >(undefined);
+  const hoverTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const listRef = React.useRef<HTMLDivElement>(null);
   const originalValueRef = React.useRef<string>(value);
   const explicitSelectionRef = React.useRef(false);
 
   // 性能优化：使用 Set 替代数组查找
-  const favoriteSet = React.useMemo(
-    () => new Set(favoriteThemes),
-    [favoriteThemes],
-  );
+  const favoriteSet = React.useMemo(() => new Set(favoriteThemes), [favoriteThemes]);
 
   // 仅在下拉框关闭时同步外部值
   React.useEffect(() => {
@@ -243,13 +229,12 @@ function ThemeCombobox({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         // 使用 requestAnimationFrame 确保 Combobox 完成高亮状态更新后再查询
         requestAnimationFrame(() => {
-          const highlighted =
-            listRef.current?.querySelector("[data-highlighted]");
+          const highlighted = listRef.current?.querySelector('[data-highlighted]');
           if (highlighted) {
-            const themeName = highlighted.getAttribute("data-value");
+            const themeName = highlighted.getAttribute('data-value');
             if (themeName) {
               onThemeHover?.(themeName);
             }
@@ -259,9 +244,9 @@ function ThemeCombobox({
     };
 
     // 使用 capture: true 在捕获阶段监听，确保事件不会被输入框拦截
-    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isOpen, onThemeHover]);
 
@@ -281,14 +266,12 @@ function ThemeCombobox({
       onOpenChange={handleOpenChange}
     >
       <div className="relative">
-        <ComboboxInput placeholder={t("Search themes...")} />
+        <ComboboxInput placeholder={t('Search themes...')} />
         <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
           <Checkbox
             id="show-favorites-only-inner"
             checked={showFavoritesOnly}
-            onCheckedChange={(checked) =>
-              onShowFavoritesOnlyChange(checked === true)
-            }
+            onCheckedChange={(checked) => onShowFavoritesOnlyChange(checked === true)}
             onClick={(e) => e.stopPropagation()}
           />
           <label
@@ -297,7 +280,7 @@ function ThemeCombobox({
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            {t("Show favorites only")}
+            {t('Show favorites only')}
           </label>
         </div>
       </div>
@@ -306,10 +289,8 @@ function ThemeCombobox({
           {filteredThemes.length === 0 && (
             <div className="py-6 text-center text-sm text-muted-foreground">
               {showEmptyFavoritesHint
-                ? t(
-                    "No favorite themes yet. Click the heart icon to add favorites.",
-                  )
-                : t("No themes found")}
+                ? t('No favorite themes yet. Click the heart icon to add favorites.')
+                : t('No themes found')}
             </div>
           )}
           {filteredThemes.map((name) => (
@@ -324,9 +305,7 @@ function ThemeCombobox({
                   isFavorite={favoriteSet.has(name)}
                   onClick={() => onToggleFavorite(name)}
                   ariaLabel={
-                    favoriteSet.has(name)
-                      ? t("Remove from favorites")
-                      : t("Add to favorites")
+                    favoriteSet.has(name) ? t('Remove from favorites') : t('Add to favorites')
                   }
                 />
               }
@@ -392,35 +371,34 @@ export function AppearanceSettings() {
     description: string;
   }[] = [
     {
-      value: "light",
+      value: 'light',
       icon: Sun,
-      label: t("Light"),
-      description: t("Bright theme"),
+      label: t('Light'),
+      description: t('Bright theme'),
     },
     {
-      value: "dark",
+      value: 'dark',
       icon: Moon,
-      label: t("Dark"),
-      description: t("Eye-friendly dark theme"),
+      label: t('Dark'),
+      description: t('Eye-friendly dark theme'),
     },
     {
-      value: "system",
+      value: 'system',
       icon: Monitor,
-      label: t("System"),
-      description: t("Follow system theme"),
+      label: t('System'),
+      description: t('Follow system theme'),
     },
     {
-      value: "sync-terminal",
+      value: 'sync-terminal',
       icon: Terminal,
-      label: t("Sync terminal theme"),
-      description: t("Match terminal color scheme"),
+      label: t('Sync terminal theme'),
+      description: t('Match terminal color scheme'),
     },
   ];
 
   // Local state for inputs
   const [localFontSize, setLocalFontSize] = React.useState(globalFontSize);
-  const [localFontFamily, setLocalFontFamily] =
-    React.useState(globalFontFamily);
+  const [localFontFamily, setLocalFontFamily] = React.useState(globalFontFamily);
   const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false);
   const [bgSettingsOpen, setBgSettingsOpen] = React.useState(false);
 
@@ -463,9 +441,7 @@ export function AppearanceSettings() {
     if (!showFavoritesOnly) {
       return themeNames;
     }
-    const favorites = themeNames.filter((name) =>
-      favoriteTerminalThemes.includes(name),
-    );
+    const favorites = themeNames.filter((name) => favoriteTerminalThemes.includes(name));
     // 当前选中的非收藏配色临时显示在列表第1位
     if (!favoriteTerminalThemes.includes(terminalTheme)) {
       return [terminalTheme, ...favorites];
@@ -473,8 +449,7 @@ export function AppearanceSettings() {
     return favorites;
   }, [themeNames, showFavoritesOnly, favoriteTerminalThemes, terminalTheme]);
 
-  const showEmptyFavoritesHint =
-    showFavoritesOnly && favoriteTerminalThemes.length === 0;
+  const showEmptyFavoritesHint = showFavoritesOnly && favoriteTerminalThemes.length === 0;
 
   // Get preview theme synchronously
   const previewTheme = React.useMemo(() => {
@@ -505,26 +480,26 @@ export function AppearanceSettings() {
     const path = await window.electronAPI.dialog.openFile({
       filters: [
         {
-          name: "Media",
+          name: 'Media',
           extensions: [
-            "png",
-            "jpg",
-            "jpeg",
-            "gif",
-            "webp",
-            "bmp",
-            "svg",
-            "mp4",
-            "webm",
-            "ogg",
-            "mov",
+            'png',
+            'jpg',
+            'jpeg',
+            'gif',
+            'webp',
+            'bmp',
+            'svg',
+            'mp4',
+            'webm',
+            'ogg',
+            'mov',
           ],
         },
       ],
     });
     if (path) {
       setBackgroundImagePath(path);
-      setBackgroundSourceType("file");
+      setBackgroundSourceType('file');
     }
   };
 
@@ -532,21 +507,21 @@ export function AppearanceSettings() {
     const path = await window.electronAPI.dialog.openDirectory();
     if (path) {
       setBackgroundFolderPath(path);
-      setBackgroundSourceType("folder");
+      setBackgroundSourceType('folder');
     }
   };
 
   // Active path based on current source type
   const activePath =
-    backgroundSourceType === "folder"
+    backgroundSourceType === 'folder'
       ? backgroundFolderPath
-      : backgroundSourceType === "url"
+      : backgroundSourceType === 'url'
         ? backgroundUrlPath
         : backgroundImagePath;
   const setActivePath =
-    backgroundSourceType === "folder"
+    backgroundSourceType === 'folder'
       ? setBackgroundFolderPath
-      : backgroundSourceType === "url"
+      : backgroundSourceType === 'url'
         ? setBackgroundUrlPath
         : setBackgroundImagePath;
 
@@ -554,10 +529,8 @@ export function AppearanceSettings() {
     <div className="space-y-6">
       {/* Theme Mode Section */}
       <div>
-        <h3 className="text-lg font-medium">{t("Theme mode")}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t("Choose interface theme")}
-        </p>
+        <h3 className="text-lg font-medium">{t('Theme mode')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Choose interface theme')}</p>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
@@ -567,18 +540,18 @@ export function AppearanceSettings() {
             key={option.value}
             onClick={() => setTheme(option.value)}
             className={cn(
-              "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-colors",
+              'flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-colors',
               theme === option.value
-                ? "border-primary bg-accent text-accent-foreground"
-                : "border-transparent bg-muted/50 hover:bg-muted",
+                ? 'border-primary bg-accent text-accent-foreground'
+                : 'border-transparent bg-muted/50 hover:bg-muted'
             )}
           >
             <div
               className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-full",
+                'flex h-10 w-10 items-center justify-center rounded-full',
                 theme === option.value
-                  ? "bg-accent-foreground/20 text-accent-foreground"
-                  : "bg-muted",
+                  ? 'bg-accent-foreground/20 text-accent-foreground'
+                  : 'bg-muted'
               )}
             >
               <option.icon className="h-5 w-5" />
@@ -590,10 +563,8 @@ export function AppearanceSettings() {
 
       {/* Beta Features Section */}
       <div className="border-t pt-6">
-        <h3 className="text-lg font-medium">{t("Beta Features")}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t("Experimental features")}
-        </p>
+        <h3 className="text-lg font-medium">{t('Beta Features')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Experimental features')}</p>
       </div>
 
       {/* Glow Effect Toggle */}
@@ -603,51 +574,41 @@ export function AppearanceSettings() {
             <Sparkles className="h-4 w-4 text-green-500" />
           </div>
           <div>
-            <p className="text-sm font-medium">{t("Glow Effect")}</p>
+            <p className="text-sm font-medium">{t('Glow Effect')}</p>
             <p className="text-xs text-muted-foreground">
-              {t("Animated glow border for AI output states")}
+              {t('Animated glow border for AI output states')}
             </p>
           </div>
         </div>
-        <Switch
-          checked={glowEffectEnabled}
-          onCheckedChange={setGlowEffectEnabled}
-        />
+        <Switch checked={glowEffectEnabled} onCheckedChange={setGlowEffectEnabled} />
       </div>
 
       {/* Background Image Settings */}
-      <Collapsible
-        open={bgSettingsOpen}
-        onOpenChange={setBgSettingsOpen}
-        className="space-y-4"
-      >
+      <Collapsible open={bgSettingsOpen} onOpenChange={setBgSettingsOpen} className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20">
               <ImageIcon className="h-4 w-4 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm font-medium">{t("Background Image")}</p>
+              <p className="text-sm font-medium">{t('Background Image')}</p>
               <p className="text-xs text-muted-foreground">
-                {t("Custom background image for the workspace")}
+                {t('Custom background image for the workspace')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Switch
-              checked={backgroundImageEnabled}
-              onCheckedChange={setBackgroundImageEnabled}
-            />
+            <Switch checked={backgroundImageEnabled} onCheckedChange={setBackgroundImageEnabled} />
             <CollapsibleTrigger
               className={cn(
-                "inline-flex items-center justify-center h-8 w-8 rounded-md",
-                "hover:bg-accent hover:text-accent-foreground transition-colors",
+                'inline-flex items-center justify-center h-8 w-8 rounded-md',
+                'hover:bg-accent hover:text-accent-foreground transition-colors'
               )}
             >
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 transition-transform duration-200",
-                  bgSettingsOpen ? "rotate-180" : "",
+                  'h-4 w-4 transition-transform duration-200',
+                  bgSettingsOpen ? 'rotate-180' : ''
                 )}
               />
             </CollapsibleTrigger>
@@ -657,58 +618,52 @@ export function AppearanceSettings() {
         <CollapsibleContent className="space-y-4 pl-12">
           {/* Source Type */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t("Source Type")}</label>
+            <label className="text-sm font-medium">{t('Source Type')}</label>
             <Select
               value={backgroundSourceType}
-              onValueChange={(v) =>
-                setBackgroundSourceType(v as "file" | "folder" | "url")
-              }
+              onValueChange={(v) => setBackgroundSourceType(v as 'file' | 'folder' | 'url')}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectPopup>
-                <SelectItem value="file">{t("Image / Video File")}</SelectItem>
-                <SelectItem value="folder">{t("Folder (Random)")}</SelectItem>
-                <SelectItem value="url">{t("URL (Auto Refresh)")}</SelectItem>
+                <SelectItem value="file">{t('Image / Video File')}</SelectItem>
+                <SelectItem value="folder">{t('Folder (Random)')}</SelectItem>
+                <SelectItem value="url">{t('URL (Auto Refresh)')}</SelectItem>
               </SelectPopup>
             </Select>
           </div>
 
           {/* Source Path */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t("Source Path")}</label>
+            <label className="text-sm font-medium">{t('Source Path')}</label>
             <div className="flex gap-2">
               <Input
                 value={activePath}
                 onChange={(e) => setActivePath(e.target.value)}
                 placeholder={
-                  backgroundSourceType === "folder"
-                    ? t("Select a folder containing images or videos")
-                    : backgroundSourceType === "url"
-                      ? t("Paste remote image URL (http/https)")
-                      : t("Local file path or URL")
+                  backgroundSourceType === 'folder'
+                    ? t('Select a folder containing images or videos')
+                    : backgroundSourceType === 'url'
+                      ? t('Paste remote image URL (http/https)')
+                      : t('Local file path or URL')
                 }
                 className="flex-1"
               />
               <Button
                 variant="outline"
-                disabled={backgroundSourceType === "url"}
-                onClick={
-                  backgroundSourceType === "folder"
-                    ? handleSelectFolder
-                    : handleSelectFile
-                }
+                disabled={backgroundSourceType === 'url'}
+                onClick={backgroundSourceType === 'folder' ? handleSelectFolder : handleSelectFile}
               >
-                {backgroundSourceType === "folder" ? (
+                {backgroundSourceType === 'folder' ? (
                   <>
                     <FolderOpen className="h-4 w-4 mr-1.5" />
-                    {t("Select Folder")}
+                    {t('Select Folder')}
                   </>
-                ) : backgroundSourceType === "url" ? (
-                  t("URL Mode")
+                ) : backgroundSourceType === 'url' ? (
+                  t('URL Mode')
                 ) : (
-                  t("Select File")
+                  t('Select File')
                 )}
               </Button>
               <Button
@@ -716,7 +671,7 @@ export function AppearanceSettings() {
                 size="icon"
                 className="shrink-0"
                 onClick={dispatchBackgroundRefresh}
-                title={t("Refresh")}
+                title={t('Refresh')}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -726,26 +681,25 @@ export function AppearanceSettings() {
           {/* Auto Random - available when source type is folder or URL */}
           {(() => {
             const canAutoRandom =
-              backgroundSourceType === "folder" ||
-              backgroundSourceType === "url";
+              backgroundSourceType === 'folder' || backgroundSourceType === 'url';
             return (
               <Collapsible className="space-y-3">
                 <CollapsibleTrigger
                   disabled={!canAutoRandom}
                   className={cn(
-                    "flex items-center gap-1 text-sm transition-colors",
+                    'flex items-center gap-1 text-sm transition-colors',
                     canAutoRandom
-                      ? "text-muted-foreground hover:text-foreground cursor-pointer"
-                      : "text-muted-foreground/40 cursor-not-allowed",
+                      ? 'text-muted-foreground hover:text-foreground cursor-pointer'
+                      : 'text-muted-foreground/40 cursor-not-allowed'
                   )}
                 >
                   <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
-                  {t("Auto Random")}
+                  {t('Auto Random')}
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 pl-5">
                   {/* Enable toggle */}
                   <div className="flex items-center justify-between">
-                    <label className="text-sm">{t("Enable")}</label>
+                    <label className="text-sm">{t('Enable')}</label>
                     <Switch
                       checked={backgroundRandomEnabled}
                       onCheckedChange={setBackgroundRandomEnabled}
@@ -754,32 +708,26 @@ export function AppearanceSettings() {
 
                   {/* Interval */}
                   <div className="flex items-center justify-between gap-4">
-                    <label className="text-sm shrink-0">
-                      {t("Interval (seconds)")}
-                    </label>
+                    <label className="text-sm shrink-0">{t('Interval (seconds)')}</label>
                     <Input
                       type="number"
                       min={5}
                       max={86400}
                       value={backgroundRandomInterval}
-                      onChange={(e) =>
-                        setBackgroundRandomInterval(Number(e.target.value))
-                      }
+                      onChange={(e) => setBackgroundRandomInterval(Number(e.target.value))}
                       className="w-24"
                     />
                   </div>
 
                   {/* Source Directory */}
-                  {backgroundSourceType === "folder" && (
+                  {backgroundSourceType === 'folder' && (
                     <div className="space-y-1.5">
-                      <label className="text-sm">{t("Source Directory")}</label>
+                      <label className="text-sm">{t('Source Directory')}</label>
                       <div className="flex gap-2">
                         <Input
                           value={backgroundFolderPath}
-                          onChange={(e) =>
-                            setBackgroundFolderPath(e.target.value)
-                          }
-                          placeholder={t("Select a folder")}
+                          onChange={(e) => setBackgroundFolderPath(e.target.value)}
+                          placeholder={t('Select a folder')}
                           className="flex-1"
                         />
                         <Button
@@ -802,7 +750,7 @@ export function AppearanceSettings() {
                     className="w-full"
                   >
                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                    {t("Refresh")}
+                    {t('Refresh')}
                   </Button>
                 </CollapsibleContent>
               </Collapsible>
@@ -812,7 +760,7 @@ export function AppearanceSettings() {
           {/* Opacity */}
           <div className="space-y-2">
             <div className="flex justify-between">
-              <label className="text-sm font-medium">{t("Opacity")}</label>
+              <label className="text-sm font-medium">{t('Opacity')}</label>
               <span className="text-sm text-muted-foreground">
                 {Math.round(backgroundOpacity * 100)}%
               </span>
@@ -823,9 +771,7 @@ export function AppearanceSettings() {
               max={100}
               step={1}
               value={Math.round(backgroundOpacity * 100)}
-              onChange={(e) =>
-                setBackgroundOpacity(Number(e.target.value) / 100)
-              }
+              onChange={(e) => setBackgroundOpacity(Number(e.target.value) / 100)}
               className="w-full h-1 rounded-full appearance-none cursor-pointer bg-input accent-primary"
             />
           </div>
@@ -833,10 +779,8 @@ export function AppearanceSettings() {
           {/* Blur */}
           <div className="space-y-2">
             <div className="flex justify-between">
-              <label className="text-sm font-medium">{t("Blur")}</label>
-              <span className="text-sm text-muted-foreground">
-                {backgroundBlur}px
-              </span>
+              <label className="text-sm font-medium">{t('Blur')}</label>
+              <span className="text-sm text-muted-foreground">{backgroundBlur}px</span>
             </div>
             <input
               type="range"
@@ -853,15 +797,13 @@ export function AppearanceSettings() {
           <Collapsible className="space-y-3">
             <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
-              {t("More Options")}
+              {t('More Options')}
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4">
               {/* Brightness */}
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <label className="text-sm font-medium">
-                    {t("Brightness")}
-                  </label>
+                  <label className="text-sm font-medium">{t('Brightness')}</label>
                   <span className="text-sm text-muted-foreground">
                     {Math.round(backgroundBrightness * 100)}%
                   </span>
@@ -872,9 +814,7 @@ export function AppearanceSettings() {
                   max={200}
                   step={1}
                   value={Math.round(backgroundBrightness * 100)}
-                  onChange={(e) =>
-                    setBackgroundBrightness(Number(e.target.value) / 100)
-                  }
+                  onChange={(e) => setBackgroundBrightness(Number(e.target.value) / 100)}
                   className="w-full h-1 rounded-full appearance-none cursor-pointer bg-input accent-primary"
                 />
               </div>
@@ -882,9 +822,7 @@ export function AppearanceSettings() {
               {/* Saturation */}
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <label className="text-sm font-medium">
-                    {t("Saturation")}
-                  </label>
+                  <label className="text-sm font-medium">{t('Saturation')}</label>
                   <span className="text-sm text-muted-foreground">
                     {Math.round(backgroundSaturation * 100)}%
                   </span>
@@ -895,9 +833,7 @@ export function AppearanceSettings() {
                   max={200}
                   step={1}
                   value={Math.round(backgroundSaturation * 100)}
-                  onChange={(e) =>
-                    setBackgroundSaturation(Number(e.target.value) / 100)
-                  }
+                  onChange={(e) => setBackgroundSaturation(Number(e.target.value) / 100)}
                   className="w-full h-1 rounded-full appearance-none cursor-pointer bg-input accent-primary"
                 />
               </div>
@@ -906,13 +842,11 @@ export function AppearanceSettings() {
 
           {/* Size Mode */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t("Size Mode")}</label>
+            <label className="text-sm font-medium">{t('Size Mode')}</label>
             <Select
               value={backgroundSizeMode}
               onValueChange={(v) =>
-                setBackgroundSizeMode(
-                  v as "cover" | "contain" | "repeat" | "center",
-                )
+                setBackgroundSizeMode(v as 'cover' | 'contain' | 'repeat' | 'center')
               }
             >
               <SelectTrigger>
@@ -931,15 +865,13 @@ export function AppearanceSettings() {
 
       {/* Terminal Section */}
       <div className="border-t pt-6">
-        <h3 className="text-lg font-medium">{t("Terminal")}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t("Terminal appearance")}
-        </p>
+        <h3 className="text-lg font-medium">{t('Terminal')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Terminal appearance')}</p>
       </div>
 
       {/* Preview */}
       <div className="space-y-2">
-        <p className="text-sm font-medium">{t("Preview")}</p>
+        <p className="text-sm font-medium">{t('Preview')}</p>
         <TerminalPreview
           theme={previewTheme}
           fontSize={localFontSize}
@@ -950,7 +882,7 @@ export function AppearanceSettings() {
 
       {/* Theme Selector */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t("Color scheme")}</span>
+        <span className="text-sm font-medium">{t('Color scheme')}</span>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={handlePrevTheme}>
             <ChevronLeft className="h-4 w-4" />
@@ -976,13 +908,13 @@ export function AppearanceSettings() {
 
       {/* Font Family */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t("Font")}</span>
+        <span className="text-sm font-medium">{t('Font')}</span>
         <Input
           value={localFontFamily}
           onChange={(e) => setLocalFontFamily(e.target.value)}
           onBlur={applyFontFamilyChange}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === 'Enter') {
               applyFontFamilyChange();
               e.currentTarget.blur();
             }
@@ -993,7 +925,7 @@ export function AppearanceSettings() {
 
       {/* Font Size */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t("Font size")}</span>
+        <span className="text-sm font-medium">{t('Font size')}</span>
         <div className="flex items-center gap-2">
           <Input
             type="number"
@@ -1001,7 +933,7 @@ export function AppearanceSettings() {
             onChange={(e) => setLocalFontSize(Number(e.target.value))}
             onBlur={applyFontSizeChange}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === 'Enter') {
                 applyFontSizeChange();
                 e.currentTarget.blur();
               }
@@ -1016,7 +948,7 @@ export function AppearanceSettings() {
 
       {/* Font Weight */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t("Font weight")}</span>
+        <span className="text-sm font-medium">{t('Font weight')}</span>
         <Select
           value={terminalFontWeight}
           onValueChange={(v) => setTerminalFontWeight(v as FontWeight)}
@@ -1036,7 +968,7 @@ export function AppearanceSettings() {
 
       {/* Font Weight Bold */}
       <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-        <span className="text-sm font-medium">{t("Bold font weight")}</span>
+        <span className="text-sm font-medium">{t('Bold font weight')}</span>
         <Select
           value={terminalFontWeightBold}
           onValueChange={(v) => setTerminalFontWeightBold(v as FontWeight)}

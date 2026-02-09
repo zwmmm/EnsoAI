@@ -767,7 +767,12 @@ export function TerminalPanel({ repoPath, cwd, isActive = false }: TerminalPanel
 
   if (!cwd) {
     return (
-      <div className={cn("h-full flex items-center justify-center", !bgImageEnabled && "bg-background")}>
+      <div
+        className={cn(
+          'h-full flex items-center justify-center',
+          !bgImageEnabled && 'bg-background'
+        )}
+      >
         <Empty className="border-0">
           <EmptyMedia variant="icon">
             <Terminal className="h-4.5 w-4.5" />
@@ -819,7 +824,12 @@ export function TerminalPanel({ repoPath, cwd, isActive = false }: TerminalPanel
       {/* Empty state overlay - shown when current worktree has no terminals */}
       {/* IMPORTANT: Don't use early return here - terminals must stay mounted to prevent PTY destruction */}
       {showEmptyState && (
-        <div className={cn("absolute inset-0 z-20 flex items-center justify-center", !bgImageEnabled && "bg-background")}>
+        <div
+          className={cn(
+            'absolute inset-0 z-20 flex items-center justify-center',
+            !bgImageEnabled && 'bg-background'
+          )}
+        >
           <Empty className="border-0">
             <EmptyMedia variant="icon">
               <Terminal className="h-4.5 w-4.5" />
@@ -850,7 +860,7 @@ export function TerminalPanel({ repoPath, cwd, isActive = false }: TerminalPanel
             }
           >
             {/* Tab bars row - flex layout */}
-            <div className={cn("flex h-9 w-full", !bgImageEnabled && "bg-background")}>
+            <div className={cn('flex h-9 w-full', !bgImageEnabled && 'bg-background')}>
               {state.groups.map((group, index) => (
                 <div
                   key={group.id}

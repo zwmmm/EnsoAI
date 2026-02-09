@@ -413,7 +413,9 @@ export function MainContent({
               />
               {/* Show overlay when no worktree is actively selected */}
               {!hasActiveWorktree && (
-                <div className={cn("absolute inset-0 z-20 flex items-center justify-center", innerBg)}>
+                <div
+                  className={cn('absolute inset-0 z-20 flex items-center justify-center', innerBg)}
+                >
                   <Empty className="border-0">
                     <EmptyMedia variant="icon">
                       <Sparkles className="h-4.5 w-4.5" />
@@ -435,7 +437,7 @@ export function MainContent({
               )}
             </>
           ) : (
-            <div className={cn("h-full flex items-center justify-center", innerBg)}>
+            <div className={cn('h-full flex items-center justify-center', innerBg)}>
               <Empty className="border-0">
                 <EmptyMedia variant="icon">
                   <Sparkles className="h-4.5 w-4.5" />

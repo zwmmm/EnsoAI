@@ -306,7 +306,10 @@ export function TerminalGroup({
                     'group relative flex h-9 min-w-[120px] max-w-[180px] items-center gap-2 border-r border-border px-3 text-sm transition-colors cursor-grab',
                     isTabActive
                       ? cn(!bgImageEnabled && 'bg-background', 'text-foreground')
-                      : cn(!bgImageEnabled && 'bg-muted hover:bg-muted/80', 'text-muted-foreground hover:text-foreground'),
+                      : cn(
+                          !bgImageEnabled && 'bg-muted hover:bg-muted/80',
+                          'text-muted-foreground hover:text-foreground'
+                        ),
                     isDragging && 'opacity-50',
                     isDropTarget && 'ring-2 ring-primary ring-inset'
                   )}
@@ -373,7 +376,12 @@ export function TerminalGroup({
 
       {/* Empty state - shown when no tabs */}
       {hasNoTabs && (
-        <div className={cn("flex h-full w-full flex-col items-center justify-center gap-4 text-muted-foreground", !bgImageEnabled && "bg-background")}>
+        <div
+          className={cn(
+            'flex h-full w-full flex-col items-center justify-center gap-4 text-muted-foreground',
+            !bgImageEnabled && 'bg-background'
+          )}
+        >
           <Terminal className="h-12 w-12 opacity-50" />
           <p className="text-sm">{t('No terminals open')}</p>
           <Button variant="outline" size="sm" onClick={handleNewTab}>

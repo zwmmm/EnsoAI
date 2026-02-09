@@ -1,6 +1,6 @@
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { type Locale, normalizeLocale } from '@shared/i18n';
 import { IPC_CHANNELS } from '@shared/types';
@@ -37,10 +37,14 @@ import {
   registerIpcHandlers,
 } from './ipc';
 import { initClaudeProviderWatcher } from './ipc/claudeProvider';
+import { cleanupTempFiles } from './ipc/files';
 import { registerWindowHandlers } from './ipc/window';
 import { registerClaudeBridgeIpcHandlers } from './services/claude/ClaudeIdeBridge';
 import { unwatchClaudeSettings } from './services/claude/ClaudeProviderManager';
-import { isAllowedLocalFilePath } from './services/files/LocalFileAccess';
+import {
+  isAllowedLocalFilePath,
+  registerAllowedLocalFileRoot,
+} from './services/files/LocalFileAccess';
 import { checkGitInstalled } from './services/git/checkGit';
 import { gitAutoFetchService } from './services/git/GitAutoFetchService';
 import { setCurrentLocale } from './services/i18n';
@@ -225,6 +229,15 @@ app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.ensoai.app');
 
+  // Allow EnhancedInput temp images to be previewed via local-file:// protocol.
+  // NOTE: This is registered here (in the same module as the protocol handler)
+  // to avoid any potential issues with module-level state not being shared.
+  const ensoaiInputDir = join(app.getPath('temp'), 'ensoai-input');
+  registerAllowedLocalFileRoot(ensoaiInputDir);
+
+  // Clean up temp files from previous sessions
+  await cleanupTempFiles();
+
   // Register protocol to handle local file:// URLs for markdown images
   protocol.handle('local-file', (request) => {
     try {
@@ -250,8 +263,7 @@ app.whenReady().then(async () => {
       // Uses net.fetch() from the main process to bypass renderer CORS/redirect issues
       // Use raw URL string check as primary detection (custom protocol hostname parsing can be unreliable)
       const isRemoteFetch =
-        request.url.startsWith('local-image://remote-fetch') ||
-        urlObj.hostname === 'remote-fetch';
+        request.url.startsWith('local-image://remote-fetch') || urlObj.hostname === 'remote-fetch';
 
       if (isRemoteFetch) {
         // Extract remote URL: try searchParams first, then manual regex as fallback
@@ -274,8 +286,12 @@ app.whenReady().then(async () => {
           const response = await net.fetch(fetchUrl, { redirect: 'follow' });
 
           if (!response.ok) {
-            console.error(`[local-image] Remote fetch failed: HTTP ${response.status} for ${fetchUrl}`);
-            return new Response(`Remote fetch failed: ${response.status}`, { status: response.status });
+            console.error(
+              `[local-image] Remote fetch failed: HTTP ${response.status} for ${fetchUrl}`
+            );
+            return new Response(`Remote fetch failed: ${response.status}`, {
+              status: response.status,
+            });
           }
 
           const contentType = response.headers.get('content-type') || 'image/jpeg';
@@ -310,7 +326,7 @@ app.whenReady().then(async () => {
         }
         filePath = pathname;
       }
-      
+
       // Normalize slashes for Windows
       if (process.platform === 'win32') {
         filePath = filePath.replace(/\//g, '\\');
@@ -322,11 +338,20 @@ app.whenReady().then(async () => {
       // Security check: only allow image/video extensions
       const ext = extname(filePath).toLowerCase();
       const allowedExts = [
-        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg',
-        '.mp4', '.webm', '.ogg', '.mov',
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.gif',
+        '.webp',
+        '.bmp',
+        '.svg',
+        '.mp4',
+        '.webm',
+        '.ogg',
+        '.mov',
         '',
       ];
-      
+
       if (!allowedExts.includes(ext) && ext !== '') {
         console.warn(`[local-image] Blocked extension: ${ext} for path: ${filePath}`);
         return new Response('Forbidden', { status: 403 });
@@ -369,19 +394,31 @@ app.whenReady().then(async () => {
                 start(controller) {
                   fsStream.on('data', (chunk: Buffer) => {
                     if (!closed) {
-                      try { controller.enqueue(chunk); } catch { closed = true; }
+                      try {
+                        controller.enqueue(chunk);
+                      } catch {
+                        closed = true;
+                      }
                     }
                   });
                   fsStream.on('end', () => {
                     if (!closed) {
                       closed = true;
-                      try { controller.close(); } catch { /* already closed */ }
+                      try {
+                        controller.close();
+                      } catch {
+                        /* already closed */
+                      }
                     }
                   });
                   fsStream.on('error', (err) => {
                     if (!closed) {
                       closed = true;
-                      try { controller.error(err); } catch { /* already closed */ }
+                      try {
+                        controller.error(err);
+                      } catch {
+                        /* already closed */
+                      }
                     }
                   });
                 },
@@ -423,7 +460,7 @@ app.whenReady().then(async () => {
       // Image files: use readFileSync (simpler, avoids net.fetch quirks with images)
       try {
         const buffer = readFileSync(filePath);
-        
+
         const mimeTypes: Record<string, string> = {
           '.png': 'image/png',
           '.jpg': 'image/jpeg',
@@ -433,7 +470,7 @@ app.whenReady().then(async () => {
           '.bmp': 'image/bmp',
           '.svg': 'image/svg+xml',
         };
-        
+
         return new Response(buffer, {
           headers: {
             'Content-Type': mimeTypes[ext] || 'application/octet-stream',

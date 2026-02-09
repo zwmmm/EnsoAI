@@ -20,6 +20,9 @@ import { useTerminalWriteStore } from '@/stores/terminalWrite';
 const toastManager = Toast.createToastManager();
 const anchoredToastManager = Toast.createToastManager();
 
+type BaseToastObject = ReturnType<typeof Toast.useToastManager>['toasts'][number];
+type BaseToastAddOptions = Parameters<typeof toastManager.add>[0];
+
 const TOAST_ICONS = {
   error: CircleAlertIcon,
   info: InfoIcon,
@@ -110,8 +113,7 @@ function Toasts({ position = 'bottom-right' }: { position: ToastPosition }) {
       >
         {toasts.map((toast) => {
           const Icon = toast.type ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS] : null;
-          const toastData = (toast.data as ToastData | undefined) ?? {};
-          const actions = toastData.actions ?? [];
+          const actions = getToastActions(toast);
 
           return (
             <Toast.Root
@@ -266,10 +268,10 @@ function AnchoredToasts() {
       <Toast.Viewport className="outline-none" data-slot="toast-viewport-anchored">
         {toasts.map((toast) => {
           const Icon = toast.type ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS] : null;
-          const toastData = (toast.data as ToastData | undefined) ?? {};
-          const actions = toastData.actions ?? [];
           const tooltipStyle = (toast.data as { tooltipStyle?: boolean })?.tooltipStyle ?? false;
           const positionerProps = toast.positionerProps;
+          const actions = getToastActions(toast);
+          const actionProps = toast.actionProps;
 
           if (!positionerProps?.anchor) {
             return null;
@@ -319,9 +321,9 @@ function AnchoredToasts() {
                     </div>
                     {actions.length > 0 && (
                       <div className="flex items-center gap-1" data-slot="toast-actions">
-                        {actions.map((action) => (
+                        {actions.map((action, index) => (
                           <Toast.Action
-                            key={action.label?.toString() ?? Math.random()}
+                            key={`${toast.id}-action-${index}`}
                             className={buttonVariants({
                               size: 'xs',
                               variant: action.variant ?? 'default',
@@ -329,7 +331,7 @@ function AnchoredToasts() {
                             data-slot="toast-action"
                             onClick={() => {
                               action.onClick?.();
-                              toastManager.close(toast.id);
+                              anchoredToastManager.close(toast.id);
                             }}
                           >
                             {action.label}
@@ -338,13 +340,12 @@ function AnchoredToasts() {
                       </div>
                     )}
 
-                    {toast.actionProps && (
+                    {actionProps && (
                       <Toast.Action
-                        className={buttonVariants({ size: 'xs' })}
+                        {...actionProps}
+                        className={cn(buttonVariants({ size: 'xs' }), actionProps.className)}
                         data-slot="toast-action"
-                      >
-                        {toast.actionProps.children}
-                      </Toast.Action>
+                      />
                     )}
                   </Toast.Content>
                 )}
@@ -365,18 +366,27 @@ type ToastAction = {
   variant?: 'default' | 'outline' | 'ghost';
 };
 
-type ToastData = {
+type ToastActionsData = {
   actions?: ToastAction[];
 };
 
-interface ToastOptions {
-  type?: ToastType;
-  title: string;
-  description?: string;
-  timeout?: number;
-  actions?: ToastAction[];
-  actionProps?: { children: React.ReactNode };
+function getToastActions(toast: BaseToastObject): ToastAction[] {
+  const data = toast.data as ToastActionsData | undefined;
+  return data?.actions ?? [];
 }
+
+type ToastOptions = Omit<BaseToastAddOptions, 'data'> & {
+  /**
+   * Ensure the toast type is the constrained union we use for timeouts/icons.
+   */
+  type?: ToastType;
+  /**
+   * Multiple action buttons.
+   * Base UI Toast supports a single `actionProps`; for multiple actions we store them in `data.actions`.
+   */
+  actions?: ToastAction[];
+  data?: BaseToastAddOptions['data'] & ToastActionsData;
+};
 
 /**
  * Add a toast with smart timeout based on type.
@@ -393,13 +403,15 @@ function addToast(options: ToastOptions) {
     info: 5000,
   };
 
-  const timeout = options.timeout ?? (options.type ? defaultTimeouts[options.type] : 5000);
+  const type = options.type;
+  const timeout = options.timeout ?? (type ? defaultTimeouts[type] : 5000);
 
-  const { actions, ...rest } = options;
+  const { actions, data, ...rest } = options;
+  const mergedData = actions ? { ...(data as object | undefined), actions } : data;
 
   return toastManager.add({
-    ...rest,
-    data: actions?.length ? { actions } : undefined,
+    ...(rest as BaseToastAddOptions),
+    data: mergedData,
     timeout,
   });
 }

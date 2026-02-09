@@ -12,24 +12,19 @@ export interface MonacoThemeOptions {
 }
 
 // Define Monaco theme from terminal theme
-export function defineMonacoTheme(
-  terminalThemeName: string,
-  options: MonacoThemeOptions = {},
-) {
+export function defineMonacoTheme(terminalThemeName: string, options: MonacoThemeOptions = {}) {
   const xtermTheme = getXtermTheme(terminalThemeName);
   if (!xtermTheme) return;
 
   const isDark = isTerminalThemeDark(terminalThemeName);
-  const { backgroundImageEnabled = false, backgroundOpacity = 0 } = options;
+  const { backgroundImageEnabled = false } = options;
 
   // When a background image is active the editor must be fully transparent so
   // it doesn't add a colour layer on top of the parent containers' bg-background
   // (which already provides the correct semi-transparent overlay via CSS vars).
   // Using the terminal theme colour here would cause a visible colour mismatch
   // because it differs from the CSS --background variable used everywhere else.
-  const editorBg = backgroundImageEnabled
-    ? '#00000000'
-    : xtermTheme.background;
+  const editorBg = backgroundImageEnabled ? '#00000000' : xtermTheme.background;
 
   const gutterBg = backgroundImageEnabled ? '#00000000' : undefined;
   const minimapBg = backgroundImageEnabled ? '#00000000' : undefined;
