@@ -19,7 +19,7 @@ export const zhTranslations: Record<string, string> = {
   'Apply on new terminals only': '更改后需新建终端才能生效',
   'Are you sure you want to delete worktree {{name}}?': '确定要删除 worktree {{name}} 吗？',
   'Are you sure you want to discard changes to {{path}}? This cannot be undone.':
-    '确定要放弃 {{path}} 的更改吗？此操作不可撤销。',
+    '确定要撤销 {{path}} 的更改吗？此操作不可恢复。',
   'Are you sure you want to exit the app?': '确定要退出应用吗？',
   'Are you sure you want to remove {{name}} from the workspace?':
     '确定要从工作区移除 {{name}} 吗？',
@@ -131,6 +131,8 @@ export const zhTranslations: Record<string, string> = {
   'Custom CLI tools': '添加自定义 CLI 工具',
   Default: '默认',
   Delete: '删除',
+  'Delete all': '全部删除',
+  'Delete all untracked files': '删除所有未跟踪文件',
   'Delete Group': '删除分组',
   Deleted: '删除',
   'Delete file': '删除文件',
@@ -139,10 +141,12 @@ export const zhTranslations: Record<string, string> = {
   'Description (optional)': '描述 (可选)',
   'Developer Tools': '开发者工具',
   Diffs: '差异',
-  Discard: '放弃更改',
-  'Discard changes': '放弃更改',
-  'Discard changes title': '放弃更改',
-  'Discard failed': '放弃更改失败',
+  Discard: '撤销更改',
+  'Discard all': '全部撤销',
+  'Discard all changes': '撤销所有更改',
+  'Discard changes': '撤销更改',
+  'Discard changes title': '撤销更改',
+  'Discard failed': '撤销更改失败',
   Disabled: '禁用',
   'Downloading update': '正在下载更新',
   Edit: '编辑',
@@ -575,10 +579,10 @@ export const zhTranslations: Record<string, string> = {
   'Sync with remote': '同步远程',
   '(commit history)': '(提交历史)',
   'Open in editor': '在编辑器中打开',
-  'Discard {{count}} changes': '放弃 {{count}} 处更改',
+  'Discard {{count}} changes': '撤销 {{count}} 处更改',
   'Delete {{count}} files': '删除 {{count}} 个文件',
   'Are you sure you want to discard changes to {{count}} files? This cannot be undone.':
-    '确定要放弃 {{count}} 个文件的更改吗？此操作不可撤销。',
+    '确定要撤销 {{count}} 个文件的更改吗？此操作不可恢复。',
   'Are you sure you want to delete {{count}} untracked files? This cannot be undone.':
     '确定要删除 {{count}} 个未跟踪的文件吗？此操作不可撤销。',
   'Are you sure you want to delete the untracked file {{path}}? This cannot be undone.':
