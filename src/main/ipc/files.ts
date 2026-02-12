@@ -80,7 +80,7 @@ function isBinaryBuffer(buffer: Buffer, sampleSize = 8192): boolean {
     if (byte === 0) {
       nullCount++;
       // If we find more than a few null bytes, it's likely binary
-      if (nullCount > 2) {
+      if (nullCount > 5) {
         return true;
       }
     }
@@ -88,6 +88,10 @@ function isBinaryBuffer(buffer: Buffer, sampleSize = 8192): boolean {
     // Count control characters (excluding common whitespace: tab, newline, carriage return)
     if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
       controlCount++;
+      // Early return if control character ratio exceeds threshold
+      if (i >= 100 && controlCount / (i + 1) > 0.1) {
+        return true;
+      }
     }
   }
 

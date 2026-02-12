@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { isImageFile, isPdfFile } from '@/components/files/fileIcons';
 import { useEditorStore } from '@/stores/editor';
 
 export function useEditor() {
@@ -26,7 +27,9 @@ export function useEditor() {
   const loadFile = useMutation({
     mutationFn: async (path: string) => {
       const { content, encoding, isBinary } = await window.electronAPI.file.read(path);
-      openFile({ path, content, encoding, isDirty: false, isUnsupported: isBinary });
+      // Binary files like images and PDFs have dedicated preview components
+      const isUnsupported = isBinary && !isImageFile(path) && !isPdfFile(path);
+      openFile({ path, content, encoding, isDirty: false, isUnsupported });
       return { content, encoding, isBinary };
     },
   });
@@ -61,7 +64,9 @@ export function useEditor() {
       } else {
         try {
           const { content, encoding, isBinary } = await window.electronAPI.file.read(path);
-          openFile({ path, content, encoding, isDirty: false, isUnsupported: isBinary });
+          // Binary files like images and PDFs have dedicated preview components
+          const isUnsupported = isBinary && !isImageFile(path) && !isPdfFile(path);
+          openFile({ path, content, encoding, isDirty: false, isUnsupported });
         } catch {
           return;
         }
