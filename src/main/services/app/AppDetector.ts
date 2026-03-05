@@ -560,30 +560,39 @@ export class AppDetector {
   }
 
   private getEditorCliPath(bundleId: string, appPath: string): string | null {
-    // VSCode, Cursor, Codium, Zed
-    if (
-      bundleId.includes('com.microsoft.VSCode') ||
-      bundleId.includes('com.todesktop.230313mzl4w4u92') || // Cursor
-      bundleId.includes('com.visualstudio.code') ||
-      bundleId.includes('dev.zed.Zed')
-    ) {
-      const possiblePaths = [
+    let possiblePaths: string[] = [];
+
+    // Cursor
+    if (bundleId.includes('com.todesktop.230313mzl4w4u92')) {
+      possiblePaths = [
         '/usr/local/bin/cursor',
         '/opt/homebrew/bin/cursor',
+        `${appPath}/Contents/Resources/app/bin/cursor`,
+      ];
+    }
+    // VSCode / Codium
+    else if (
+      bundleId.includes('com.microsoft.VSCode') ||
+      bundleId.includes('com.visualstudio.code')
+    ) {
+      possiblePaths = [
         '/usr/local/bin/code',
         '/opt/homebrew/bin/code',
+        `${appPath}/Contents/Resources/app/bin/code`,
+      ];
+    }
+    // Zed
+    else if (bundleId.includes('dev.zed.Zed')) {
+      possiblePaths = [
         '/usr/local/bin/zed',
         '/opt/homebrew/bin/zed',
-        `${appPath}/Contents/Resources/app/bin/cursor`,
-        `${appPath}/Contents/Resources/app/bin/code`,
         `${appPath}/Contents/Resources/zed`,
       ];
+    }
 
-      for (const path of possiblePaths) {
-        try {
-          execSync(`test -f "${path}"`);
-          return path;
-        } catch {}
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        return path;
       }
     }
 
