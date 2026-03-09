@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, GitBranch, GripVertical, History, PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { GitSyncButton } from '@/components/git/GitSyncButton';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -75,7 +76,6 @@ export function SourceControlPanel({
   const queryClient = useQueryClient();
 
   // Accordion state - collapsible sections
-  const [reposExpanded, setReposExpanded] = useState(true);
   const [changesExpanded, setChangesExpanded] = useState(true);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -132,7 +132,7 @@ export function SourceControlPanel({
   const checkoutSubmoduleMutation = useCheckoutSubmoduleBranch();
 
   // Submodules
-  const { data: submodules = [] } = useSubmodules(rootPath ?? null);
+  const { data: submodules = [], isLoading: submodulesLoading } = useSubmodules(rootPath ?? null);
 
   // Generic pull/push mutations for both main repo and submodules
   const pullMutation = useGitPull();
@@ -833,19 +833,12 @@ export function SourceControlPanel({
               exit={{ width: 0, opacity: 0 }}
               transition={panelTransition}
             >
-              {/* Repositories Section (VSCode-style) */}
+              {/* Repositories Section (Tabs) */}
               <RepositoryList
                 repositories={repositories}
                 selectedId={selectedRepo?.path ?? null}
                 onSelect={handleRepoSelect}
-                expanded={reposExpanded}
-                onToggleExpand={() => setReposExpanded(!reposExpanded)}
-                onCollapseSidebar={() => setSidebarCollapsed(true)}
-                isSyncing={isSyncing}
-                onSync={handleSync}
-                onPublish={handlePublish}
-                onCheckout={handleBranchCheckout}
-                isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
+                isLoading={submodulesLoading}
               />
 
               {/* Changes Section (Collapsible) */}
@@ -888,6 +881,17 @@ export function SourceControlPanel({
                       checkoutMutation.isPending || checkoutSubmoduleMutation.isPending
                     }
                     size="xs"
+                  />
+
+                  {/* Git Sync Button */}
+                  <GitSyncButton
+                    ahead={selectedRepo?.ahead ?? 0}
+                    behind={selectedRepo?.behind ?? 0}
+                    tracking={selectedRepo?.tracking ?? false}
+                    currentBranch={selectedRepo?.branch ?? null}
+                    isSyncing={isSyncing}
+                    onSync={selectedRepoPath ? () => handleSync(selectedRepoPath) : undefined}
+                    onPublish={selectedRepoPath ? () => handlePublish(selectedRepoPath) : undefined}
                   />
                 </div>
 

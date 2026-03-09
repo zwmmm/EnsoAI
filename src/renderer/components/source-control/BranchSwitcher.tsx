@@ -81,11 +81,11 @@ export function BranchSwitcher({
     >
       <SelectTrigger
         className={cn(
-          'border-0 bg-transparent shadow-none ring-0 ring-transparent before:shadow-none before:!shadow-none transition-colors dark:bg-transparent shrink-0',
-          'focus-visible:ring-0 focus-visible:border-0 hover:ring-0 hover:shadow-none hover:before:shadow-none',
+          'border border-transparent bg-transparent shadow-none ring-0 ring-transparent before:shadow-none before:!shadow-none transition-colors dark:bg-transparent shrink-0 rounded-md',
+          'focus-visible:ring-0 focus-visible:border-input hover:ring-0 hover:shadow-none hover:before:shadow-none hover:border-input',
           size === 'xs' &&
-            'h-auto min-h-0 min-w-0 w-auto max-w-20 gap-0 p-0 text-xs text-muted-foreground hover:text-foreground sm:!min-h-0 sm:!h-auto',
-          size === 'sm' && 'h-6 min-h-6 min-w-0 w-auto max-w-32 gap-1 px-1.5 text-xs',
+            'h-auto min-h-0 min-w-0 w-auto max-w-20 gap-0 px-2 py-1 text-xs text-muted-foreground hover:text-foreground sm:!min-h-0 sm:!h-auto',
+          size === 'sm' && 'h-6 min-h-6 min-w-0 w-auto max-w-32 gap-1 px-2 text-xs',
           size === 'md' && 'h-7 min-h-7 min-w-0 w-auto max-w-40 gap-1.5 px-2 text-sm'
         )}
         disabled={isDisabled}
