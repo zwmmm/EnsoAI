@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { consumeClaudeProviderSwitch, isClaudeProviderMatch } from '@/lib/claudeProvider';
-import { addToast, toastManager } from '@/components/ui/toast';
-import { useSettingsStore } from '@/stores/settings';
-import { useI18n } from '@/i18n';
 import type { SettingsCategory } from '@/components/settings/constants';
+import { addToast, toastManager } from '@/components/ui/toast';
+import { useI18n } from '@/i18n';
+import { consumeClaudeProviderSwitch, isClaudeProviderMatch } from '@/lib/claudeProvider';
+import { useSettingsStore } from '@/stores/settings';
 
 export function useClaudeProviderListener(
   setSettingsCategory: (category: SettingsCategory) => void,
@@ -13,10 +13,16 @@ export function useClaudeProviderListener(
 ) {
   const { t } = useI18n();
   const claudeProviders = useSettingsStore((s) => s.claudeCodeIntegration.providers);
+  const enableProviderWatcher = useSettingsStore(
+    (s) => s.claudeCodeIntegration.enableProviderWatcher ?? true
+  );
   const providerToastRef = useRef<ReturnType<typeof toastManager.add> | null>(null);
 
   useEffect(() => {
     const cleanup = window.electronAPI.claudeProvider.onSettingsChanged((data) => {
+      // Skip if provider watcher is disabled
+      if (!enableProviderWatcher) return;
+
       const { extracted } = data;
       if (!extracted?.baseUrl) return;
 
@@ -86,5 +92,13 @@ export function useClaudeProviderListener(
       }
       cleanup();
     };
-  }, [claudeProviders, t, openSettings, setSettingsCategory, setScrollToProvider, setPendingProviderAction]);
+  }, [
+    claudeProviders,
+    t,
+    openSettings,
+    setSettingsCategory,
+    setScrollToProvider,
+    setPendingProviderAction,
+    enableProviderWatcher,
+  ]);
 }

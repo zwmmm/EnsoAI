@@ -154,6 +154,7 @@ export const defaultClaudeCodeIntegrationSettings: ClaudeCodeIntegrationSettings
   statusLineFields: defaultStatusLineFieldSettings,
   tmuxEnabled: false, // Disable tmux wrapping by default
   showProviderSwitcher: true,
+  enableProviderWatcher: true, // Enable provider watcher by default
   enableProviderDisableFeature: false,
   providers: [],
   enhancedInputEnabled: false, // Disable enhanced input by default

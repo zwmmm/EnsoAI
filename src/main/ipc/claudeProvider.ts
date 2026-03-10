@@ -5,6 +5,7 @@ import {
   applyProvider,
   extractProviderFromSettings,
   readClaudeSettings,
+  unwatchClaudeSettings,
   watchClaudeSettings,
 } from '../services/claude/ClaudeProviderManager';
 
@@ -22,9 +23,26 @@ export function registerClaudeProviderHandlers(): void {
   });
 }
 
+// Keep a reference to the window for dynamic watcher toggling
+let watcherWindow: BrowserWindow | null = null;
+
 /**
- * 初始化 Provider 监听
+ * Initialize provider watcher (only starts watching if enabled)
  */
-export function initClaudeProviderWatcher(window: BrowserWindow): void {
-  watchClaudeSettings(window);
+export function initClaudeProviderWatcher(window: BrowserWindow, enabled: boolean): void {
+  watcherWindow = window;
+  if (enabled) {
+    watchClaudeSettings(window);
+  }
+}
+
+/**
+ * Toggle provider watcher based on setting change
+ */
+export function toggleClaudeProviderWatcher(enabled: boolean): void {
+  if (enabled && watcherWindow && !watcherWindow.isDestroyed()) {
+    watchClaudeSettings(watcherWindow);
+  } else {
+    unwatchClaudeSettings();
+  }
 }

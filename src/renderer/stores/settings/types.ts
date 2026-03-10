@@ -187,6 +187,7 @@ export interface ClaudeCodeIntegrationSettings {
   statusLineFields: StatusLineFieldSettings; // Which fields to display in status line
   tmuxEnabled: boolean; // Enable tmux session wrapping for persistent terminal sessions
   showProviderSwitcher: boolean; // Show provider switcher in SessionBar
+  enableProviderWatcher: boolean; // Enable watcher for Claude Code settings.json changes
   enableProviderDisableFeature: boolean; // Enable/disable the provider temporary disable feature
   providers: import('@shared/types').ClaudeProvider[];
   enhancedInputEnabled: boolean; // Enable enhanced input panel for Claude Code

@@ -1087,6 +1087,8 @@ export const zhTranslations: Record<string, string> = {
   'Allow temporarily disabling individual providers': '允许临时禁用单个 Provider',
   'Show provider switcher in SessionBar for quick switching':
     '在 SessionBar 上显示 Provider 切换器，方便快速切换',
+  'Provider Watcher': 'Provider 监听',
+  'Watch Claude Code settings.json for external changes': '监听 Claude Code 配置文件的外部变化',
   'Select Provider': 'Switch Provider',
   'Click to enable this Provider': '单击启用该 Provider',
   'Click to disable this Provider': '单击临时禁用该 Provider',

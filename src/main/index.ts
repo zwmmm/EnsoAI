@@ -586,8 +586,12 @@ app.whenReady().then(async () => {
     webInspectorServer.setMainWindow(null);
     mainWindow = null;
   });
-  // Initialize Claude Provider Watcher
-  initClaudeProviderWatcher(mainWindow);
+  // Initialize Claude Provider Watcher (only when enableProviderWatcher is true)
+  const appSettings = readSettings();
+  const providerWatcherEnabled =
+    (appSettings?.claudeCodeIntegration as Record<string, unknown>)?.enableProviderWatcher !==
+    false;
+  initClaudeProviderWatcher(mainWindow, providerWatcherEnabled);
 
   // IMPORTANT: Set up did-finish-load handler BEFORE handling command line args
   // to avoid race condition where page loads before handler is registered

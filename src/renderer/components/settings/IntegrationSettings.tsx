@@ -539,6 +539,22 @@ export function IntegrationSettings({ scrollToProvider }: IntegrationSettingsPro
           />
         </div>
 
+        {/* Provider Watcher */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-sm font-medium">{t('Provider Watcher')}</span>
+            <p className="text-xs text-muted-foreground">
+              {t('Watch Claude Code settings.json for external changes')}
+            </p>
+          </div>
+          <Switch
+            checked={claudeCodeIntegration.enableProviderWatcher ?? true}
+            onCheckedChange={(checked) =>
+              setClaudeCodeIntegration({ enableProviderWatcher: checked })
+            }
+          />
+        </div>
+
         {/* Provider Disable Feature */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">

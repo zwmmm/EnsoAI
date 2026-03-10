@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { IPC_CHANNELS } from '@shared/types';
 import { app, ipcMain } from 'electron';
+import { toggleClaudeProviderWatcher } from './claudeProvider';
 
 function getSettingsPath(): string {
   return join(app.getPath('userData'), 'settings.json');
@@ -82,8 +83,19 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_WRITE, async (_, data: unknown) => {
     try {
+      const newData = data as Record<string, unknown>;
+
+      // Detect enableProviderWatcher change and toggle watcher accordingly
+      const oldEnabled = (cachedSettings?.claudeCodeIntegration as Record<string, unknown>)
+        ?.enableProviderWatcher;
+      const newEnabled = (newData.claudeCodeIntegration as Record<string, unknown>)
+        ?.enableProviderWatcher;
+      if (oldEnabled !== newEnabled) {
+        toggleClaudeProviderWatcher(newEnabled !== false);
+      }
+
       // 更新内存缓存
-      cachedSettings = data as Record<string, unknown>;
+      cachedSettings = newData;
       isDirty = true;
 
       // 防抖写入
