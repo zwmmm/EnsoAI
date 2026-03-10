@@ -21,7 +21,13 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { toastManager } from '@/components/ui/toast';
-import { useGitBranches, useGitCheckout, useGitPull, useGitPush } from '@/hooks/useGit';
+import {
+  useGitBranches,
+  useGitCheckout,
+  useGitCreateBranch,
+  useGitPull,
+  useGitPush,
+} from '@/hooks/useGit';
 import { useCommitDiff, useCommitFiles, useGitHistoryInfinite } from '@/hooks/useGitHistory';
 import { useGitSync } from '@/hooks/useGitSync';
 import {
@@ -127,6 +133,7 @@ export function SourceControlPanel({
   } = useGitBranches(rootPath ?? null);
   const checkoutMutation = useGitCheckout();
   const checkoutSubmoduleMutation = useCheckoutSubmoduleBranch();
+  const createBranchMutation = useGitCreateBranch();
 
   // Submodules
   const { data: submodules = [], isLoading: submodulesLoading } = useSubmodules(rootPath ?? null);
@@ -455,6 +462,45 @@ export function SourceControlPanel({
       refetchStatus,
       refetchSubmoduleChanges,
       refetchSubmoduleCommits,
+      t,
+    ]
+  );
+
+  // Create branch handler - creates and checks out new branch
+  const handleCreateBranch = useCallback(
+    async (repoPath: string, name: string) => {
+      if (!repoPath || createBranchMutation.isPending) return;
+
+      try {
+        await createBranchMutation.mutateAsync({ workdir: repoPath, name });
+        await checkoutMutation.mutateAsync({ workdir: repoPath, branch: name });
+        refetch();
+        refetchBranches();
+        refetchCommits();
+        refetchStatus();
+
+        toastManager.add({
+          title: t('Branch created'),
+          description: t('Branch switched to {{branch}}', { branch: name }),
+          type: 'success',
+          timeout: 3000,
+        });
+      } catch (error) {
+        toastManager.add({
+          title: t('Failed to create branch'),
+          description: error instanceof Error ? error.message : String(error),
+          type: 'error',
+          timeout: 5000,
+        });
+      }
+    },
+    [
+      createBranchMutation,
+      checkoutMutation,
+      refetch,
+      refetchBranches,
+      refetchCommits,
+      refetchStatus,
       t,
     ]
   );
@@ -861,6 +907,9 @@ export function SourceControlPanel({
                 onCheckout={(branch) =>
                   selectedRepoPath && handleBranchCheckout(selectedRepoPath, branch)
                 }
+                onCreateBranch={(name) =>
+                  selectedRepoPath && handleCreateBranch(selectedRepoPath, name)
+                }
                 isLoading={currentBranchesLoading}
                 isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
                 size="xs"
@@ -955,11 +1004,11 @@ export function SourceControlPanel({
 
             <div
               className={cn(
-                'overflow-hidden transition-opacity duration-150',
+                'relative overflow-hidden transition-opacity duration-150',
                 historyExpanded ? 'flex-1 min-h-0 opacity-100' : 'h-0 opacity-0'
               )}
             >
-              <div className="h-full">
+              <div className="absolute inset-0">
                 <CommitHistoryList
                   commits={currentCommits}
                   selectedHash={selectedCommitHash}

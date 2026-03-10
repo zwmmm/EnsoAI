@@ -1,6 +1,6 @@
 import type { GitBranch } from '@shared/types';
-import { GitBranch as GitBranchIcon, Loader2, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { GitBranch as GitBranchIcon, Loader2, Plus, Search } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -19,6 +19,7 @@ interface BranchSwitcherProps {
   currentBranch: string | null;
   branches?: GitBranch[];
   onCheckout: (branch: string) => void;
+  onCreateBranch?: (name: string) => void;
   onOpen?: () => void;
   isLoading?: boolean;
   isCheckingOut?: boolean;
@@ -30,6 +31,7 @@ export function BranchSwitcher({
   currentBranch,
   branches = [],
   onCheckout,
+  onCreateBranch,
   onOpen,
   isLoading,
   isCheckingOut,
@@ -38,6 +40,9 @@ export function BranchSwitcher({
 }: BranchSwitcherProps) {
   const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
+  const createInputRef = useRef<HTMLInputElement>(null);
 
   // Filter and separate branches
   const { localBranches, remoteBranches } = useMemo(() => {
@@ -69,7 +74,17 @@ export function BranchSwitcher({
       onOpen?.();
     } else {
       setSearchQuery('');
+      setIsCreating(false);
+      setNewBranchName('');
     }
+  };
+
+  const handleCreateBranch = () => {
+    const name = newBranchName.trim();
+    if (!name || !onCreateBranch) return;
+    onCreateBranch(name);
+    setIsCreating(false);
+    setNewBranchName('');
   };
 
   const isDisabled = disabled || isLoading || isCheckingOut;
@@ -115,6 +130,44 @@ export function BranchSwitcher({
             />
           </div>
         </div>
+
+        {/* Create new branch */}
+        {onCreateBranch && (
+          <div className="px-2 pb-1">
+            {isCreating ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  ref={createInputRef}
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') handleCreateBranch();
+                    if (e.key === 'Escape') {
+                      setIsCreating(false);
+                      setNewBranchName('');
+                    }
+                  }}
+                  placeholder={t('Branch name...')}
+                  className="text-xs"
+                  autoFocus
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                onClick={() => {
+                  setIsCreating(true);
+                  setTimeout(() => createInputRef.current?.focus(), 0);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t('Create new branch...')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Loading state */}
         {isLoading && (
