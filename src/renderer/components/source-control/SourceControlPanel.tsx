@@ -1,6 +1,5 @@
 import { getPathBasename, joinPath } from '@shared/utils/path';
 import { useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, GitBranch, GripVertical, History, PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -42,7 +41,6 @@ import {
   useUnstageSubmodule,
 } from '@/hooks/useSubmodules';
 import { useI18n } from '@/i18n';
-import { heightVariants, springFast } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { useSourceControlStore } from '@/stores/sourceControl';
 import { BranchSwitcher } from './BranchSwitcher';
@@ -50,7 +48,6 @@ import { ChangesList } from './ChangesList';
 import { CommitBox } from './CommitBox';
 import { CommitDiffViewer } from './CommitDiffViewer';
 import { CommitHistoryList } from './CommitHistoryList';
-import { panelTransition } from './constants';
 import { DiffViewer } from './DiffViewer';
 import { RepositoryList } from './RepositoryList';
 import type { Repository } from './types';
@@ -803,228 +800,195 @@ export function SourceControlPanel({
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar Expand Button (when collapsed) */}
-        <AnimatePresence initial={false}>
-          {sidebarCollapsed && (
-            <motion.button
-              key="sidebar-expand"
-              type="button"
-              onClick={() => setSidebarCollapsed(false)}
-              className="flex h-full w-6 shrink-0 items-center justify-center border-r text-muted-foreground/60 hover:bg-accent/50 hover:text-foreground transition-colors"
-              title={t('Show sidebar')}
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 24, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={panelTransition}
-            >
-              <PanelLeft className="h-3.5 w-3.5" />
-            </motion.button>
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(false)}
+          className={cn(
+            'flex h-full shrink-0 items-center justify-center border-r text-muted-foreground/60 hover:bg-accent/50 hover:text-foreground transition-all duration-200 ease-out overflow-hidden',
+            sidebarCollapsed ? 'w-6 opacity-100' : 'w-0 opacity-0'
           )}
-        </AnimatePresence>
+          title={t('Show sidebar')}
+        >
+          <PanelLeft className="h-3.5 w-3.5 shrink-0" />
+        </button>
 
         {/* Left: Changes List */}
-        <AnimatePresence initial={false}>
-          {!sidebarCollapsed && (
-            <motion.div
-              key="sidebar"
-              className="flex shrink-0 flex-col border-r overflow-hidden"
-              style={{ width: panelWidth }}
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: panelWidth, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={panelTransition}
-            >
-              {/* Repositories Section (VSCode-style) */}
-              <RepositoryList
-                repositories={repositories}
-                selectedId={selectedRepo?.path ?? null}
-                onSelect={handleRepoSelect}
-                expanded={reposExpanded}
-                onToggleExpand={() => setReposExpanded(!reposExpanded)}
-                onCollapseSidebar={() => setSidebarCollapsed(true)}
-                isSyncing={isSyncing}
-                onSync={handleSync}
-                onPublish={handlePublish}
-                onCheckout={handleBranchCheckout}
-                isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
-              />
-
-              {/* Changes Section (Collapsible) */}
-              <div
-                className={cn(
-                  'flex flex-col border-b transition-all duration-200 ease-out',
-                  changesExpanded ? 'flex-1 min-h-0' : 'shrink-0'
-                )}
-              >
-                <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors pr-4">
-                  <button
-                    type="button"
-                    onClick={() => setChangesExpanded(!changesExpanded)}
-                    className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
-                        !changesExpanded && '-rotate-90'
-                      )}
-                    />
-                    <GitBranch className="h-4 w-4" />
-                    <span className="text-sm font-medium shrink-0">{t('Changes')}</span>
-                    {currentChanges.length > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        ({currentChanges.length})
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Branch Switcher - uses selected repo's branches */}
-                  <BranchSwitcher
-                    currentBranch={selectedRepo?.branch ?? null}
-                    branches={currentBranches}
-                    onCheckout={(branch) =>
-                      selectedRepoPath && handleBranchCheckout(selectedRepoPath, branch)
-                    }
-                    isLoading={currentBranchesLoading}
-                    isCheckingOut={
-                      checkoutMutation.isPending || checkoutSubmoduleMutation.isPending
-                    }
-                    size="xs"
-                  />
-                </div>
-
-                {/* Collapsible content with AnimatePresence for proper unmounting */}
-                <AnimatePresence initial={false}>
-                  {changesExpanded && (
-                    <motion.div
-                      key="changes-content"
-                      variants={heightVariants}
-                      initial="initial"
-                      animate="animate"
-                      exit="exit"
-                      transition={springFast}
-                      className="flex flex-col flex-1 min-h-0 overflow-hidden"
-                    >
-                      {/* Warning for skipped directories - only for main repo */}
-                      {!selectedSubmodulePath && skippedDirs && skippedDirs.length > 0 && (
-                        <div className="mx-2 mt-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
-                          <span className="font-medium">{t('Performance warning')}:</span>{' '}
-                          {t('Skipped {{dirs}} (not in .gitignore)', {
-                            dirs: skippedDirs.join(', '),
-                          })}
-                        </div>
-                      )}
-                      {!selectedSubmodulePath && fileChangesResult?.truncated && (
-                        <div className="mx-2 mt-2 rounded-md bg-muted/50 border px-3 py-2 text-xs text-muted-foreground">
-                          {t('Too many changes, showing first {{count}}.', {
-                            count:
-                              fileChangesResult.truncatedLimit ?? fileChangesResult.changes.length,
-                          })}
-                        </div>
-                      )}
-                      <div className="flex-1 overflow-hidden min-h-0">
-                        <ChangesList
-                          staged={staged}
-                          unstaged={unstaged}
-                          selectedFile={selectedSubmodulePath ? null : selectedFile}
-                          onFileClick={handleFileClick}
-                          onStage={handleStage}
-                          onUnstage={handleUnstage}
-                          onDiscard={handleDiscard}
-                          onDeleteUntracked={handleDeleteUntracked}
-                          onRefresh={async () => {
-                            if (selectedSubmodulePath) {
-                              refetchSubmoduleChanges();
-                              refetchSubmoduleCommits();
-                            } else if (rootPath) {
-                              await fetchMutation.mutateAsync({ workdir: rootPath });
-                              refetch();
-                              refetchCommits();
-                              refetchStatus();
-                            }
-                          }}
-                          isRefreshing={
-                            selectedSubmodulePath
-                              ? submoduleChangesLoading
-                              : isFetching || fetchMutation.isPending
-                          }
-                          repoPath={selectedRepoPath}
-                          sessionId={sessionId}
-                        />
-                      </div>
-                      {/* Commit Box */}
-                      <CommitBox
-                        stagedCount={staged.length}
-                        onCommit={handleCommit}
-                        isCommitting={isCommitting}
-                        rootPath={selectedRepoPath}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* History Section (Collapsible) */}
-              <div
-                className={cn(
-                  'flex flex-col transition-all duration-200 ease-out',
-                  historyExpanded ? 'flex-1 min-h-0' : 'shrink-0'
-                )}
-              >
-                <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors">
-                  <button
-                    type="button"
-                    onClick={() => setHistoryExpanded(!historyExpanded)}
-                    className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
-                        !historyExpanded && '-rotate-90'
-                      )}
-                    />
-                    <History className="h-4 w-4" />
-                    <span className="text-sm font-medium">{t('History')}</span>
-                  </button>
-                </div>
-
-                {/* Collapsible content with AnimatePresence for proper unmounting */}
-                <AnimatePresence initial={false}>
-                  {historyExpanded && (
-                    <motion.div
-                      key="history-content"
-                      variants={heightVariants}
-                      initial="initial"
-                      animate="animate"
-                      exit="exit"
-                      transition={springFast}
-                      className="flex-1 min-h-0 overflow-hidden"
-                    >
-                      <div className="h-full">
-                        <CommitHistoryList
-                          commits={currentCommits}
-                          selectedHash={selectedCommitHash}
-                          onCommitClick={handleCommitClick}
-                          isLoading={currentCommitsLoading}
-                          isFetchingNextPage={currentIsFetchingNextPage}
-                          hasNextPage={currentHasNextPage}
-                          onLoadMore={() => {
-                            if (currentHasNextPage && !currentIsFetchingNextPage) {
-                              currentFetchNextPage();
-                            }
-                          }}
-                          expandedCommitHash={expandedCommitHash}
-                          commitFiles={commitFiles}
-                          commitFilesLoading={commitFilesLoading}
-                          selectedFile={selectedCommitFile}
-                          onFileClick={handleCommitFileClick}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
+        <div
+          className={cn(
+            'flex shrink-0 flex-col border-r overflow-hidden transition-[width,opacity] duration-200 ease-out',
+            sidebarCollapsed ? 'w-0 opacity-0' : 'opacity-100'
           )}
-        </AnimatePresence>
+          style={{ width: sidebarCollapsed ? 0 : panelWidth }}
+        >
+          {/* Repositories Section (VSCode-style) */}
+          <RepositoryList
+            repositories={repositories}
+            selectedId={selectedRepo?.path ?? null}
+            onSelect={handleRepoSelect}
+            expanded={reposExpanded}
+            onToggleExpand={() => setReposExpanded(!reposExpanded)}
+            onCollapseSidebar={() => setSidebarCollapsed(true)}
+            isSyncing={isSyncing}
+            onSync={handleSync}
+            onPublish={handlePublish}
+            onCheckout={handleBranchCheckout}
+            isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
+          />
+
+          {/* Changes Section (Collapsible) */}
+          <div
+            className={cn(
+              'flex flex-col border-b overflow-hidden shrink-0 min-h-0 transition-[flex-grow] duration-200 ease-out',
+              changesExpanded ? 'grow' : 'grow-0'
+            )}
+          >
+            <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors pr-4">
+              <button
+                type="button"
+                onClick={() => setChangesExpanded(!changesExpanded)}
+                className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
+                    !changesExpanded && '-rotate-90'
+                  )}
+                />
+                <GitBranch className="h-4 w-4" />
+                <span className="text-sm font-medium shrink-0">{t('Changes')}</span>
+                {currentChanges.length > 0 && (
+                  <span className="text-xs text-muted-foreground">({currentChanges.length})</span>
+                )}
+              </button>
+
+              {/* Branch Switcher - uses selected repo's branches */}
+              <BranchSwitcher
+                currentBranch={selectedRepo?.branch ?? null}
+                branches={currentBranches}
+                onCheckout={(branch) =>
+                  selectedRepoPath && handleBranchCheckout(selectedRepoPath, branch)
+                }
+                isLoading={currentBranchesLoading}
+                isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
+                size="xs"
+              />
+            </div>
+
+            <div
+              className={cn(
+                'overflow-hidden transition-opacity duration-150',
+                changesExpanded ? 'flex flex-col flex-1 min-h-0 opacity-100' : 'h-0 opacity-0'
+              )}
+            >
+              {/* Warning for skipped directories - only for main repo */}
+              {!selectedSubmodulePath && skippedDirs && skippedDirs.length > 0 && (
+                <div className="mx-2 mt-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
+                  <span className="font-medium">{t('Performance warning')}:</span>{' '}
+                  {t('Skipped {{dirs}} (not in .gitignore)', {
+                    dirs: skippedDirs.join(', '),
+                  })}
+                </div>
+              )}
+              {!selectedSubmodulePath && fileChangesResult?.truncated && (
+                <div className="mx-2 mt-2 rounded-md bg-muted/50 border px-3 py-2 text-xs text-muted-foreground">
+                  {t('Too many changes, showing first {{count}}.', {
+                    count: fileChangesResult.truncatedLimit ?? fileChangesResult.changes.length,
+                  })}
+                </div>
+              )}
+              <div className="flex-1 overflow-hidden min-h-0">
+                <ChangesList
+                  staged={staged}
+                  unstaged={unstaged}
+                  selectedFile={selectedSubmodulePath ? null : selectedFile}
+                  onFileClick={handleFileClick}
+                  onStage={handleStage}
+                  onUnstage={handleUnstage}
+                  onDiscard={handleDiscard}
+                  onDeleteUntracked={handleDeleteUntracked}
+                  onRefresh={async () => {
+                    if (selectedSubmodulePath) {
+                      refetchSubmoduleChanges();
+                      refetchSubmoduleCommits();
+                    } else if (rootPath) {
+                      await fetchMutation.mutateAsync({ workdir: rootPath });
+                      refetch();
+                      refetchCommits();
+                      refetchStatus();
+                    }
+                  }}
+                  isRefreshing={
+                    selectedSubmodulePath
+                      ? submoduleChangesLoading
+                      : isFetching || fetchMutation.isPending
+                  }
+                  repoPath={selectedRepoPath}
+                  sessionId={sessionId}
+                />
+              </div>
+              {/* Commit Box */}
+              <CommitBox
+                stagedCount={staged.length}
+                onCommit={handleCommit}
+                isCommitting={isCommitting}
+                rootPath={selectedRepoPath}
+              />
+            </div>
+          </div>
+
+          {/* History Section (Collapsible) */}
+          <div
+            className={cn(
+              'flex flex-col overflow-hidden shrink-0 min-h-0 transition-[flex-grow] duration-200 ease-out',
+              historyExpanded ? 'grow' : 'grow-0'
+            )}
+          >
+            <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors">
+              <button
+                type="button"
+                onClick={() => setHistoryExpanded(!historyExpanded)}
+                className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
+                    !historyExpanded && '-rotate-90'
+                  )}
+                />
+                <History className="h-4 w-4" />
+                <span className="text-sm font-medium">{t('History')}</span>
+              </button>
+            </div>
+
+            <div
+              className={cn(
+                'overflow-hidden transition-opacity duration-150',
+                historyExpanded ? 'flex-1 min-h-0 opacity-100' : 'h-0 opacity-0'
+              )}
+            >
+              <div className="h-full">
+                <CommitHistoryList
+                  commits={currentCommits}
+                  selectedHash={selectedCommitHash}
+                  onCommitClick={handleCommitClick}
+                  isLoading={currentCommitsLoading}
+                  isFetchingNextPage={currentIsFetchingNextPage}
+                  hasNextPage={currentHasNextPage}
+                  onLoadMore={() => {
+                    if (currentHasNextPage && !currentIsFetchingNextPage) {
+                      currentFetchNextPage();
+                    }
+                  }}
+                  expandedCommitHash={expandedCommitHash}
+                  commitFiles={commitFiles}
+                  commitFilesLoading={commitFilesLoading}
+                  selectedFile={selectedCommitFile}
+                  onFileClick={handleCommitFileClick}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Resize Handle */}
         {!sidebarCollapsed && (

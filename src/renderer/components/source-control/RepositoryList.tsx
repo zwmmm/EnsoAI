@@ -1,8 +1,7 @@
-import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, FolderGit2, GitBranch, Loader2, PanelLeftClose } from 'lucide-react';
 import { GitSyncButton } from '@/components/git/GitSyncButton';
+import { SmoothCollapse } from '@/components/ui/smooth-collapse';
 import { useI18n } from '@/i18n';
-import { heightVariants, springFast } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { BranchSwitcher } from './BranchSwitcher';
 import type { Repository } from './types';
@@ -76,41 +75,29 @@ export function RepositoryList({
       </div>
 
       {/* Repository list */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="repo-list"
-            variants={heightVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={springFast}
-            className="overflow-hidden"
-          >
-            {isLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="flex flex-col pb-1">
-                {repositories.map((repo) => (
-                  <RepositoryItem
-                    key={repo.path}
-                    repository={repo}
-                    isSelected={selectedId === repo.path}
-                    onSelect={() => onSelect(repo.path)}
-                    isSyncing={isSyncing}
-                    onSync={onSync ? () => onSync(repo.path) : undefined}
-                    onPublish={onPublish ? () => onPublish(repo.path) : undefined}
-                    onCheckout={onCheckout ? (branch) => onCheckout(repo.path, branch) : undefined}
-                    isCheckingOut={isCheckingOut}
-                  />
-                ))}
-              </div>
-            )}
-          </motion.div>
+      <SmoothCollapse open={expanded}>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="flex flex-col pb-1">
+            {repositories.map((repo) => (
+              <RepositoryItem
+                key={repo.path}
+                repository={repo}
+                isSelected={selectedId === repo.path}
+                onSelect={() => onSelect(repo.path)}
+                isSyncing={isSyncing}
+                onSync={onSync ? () => onSync(repo.path) : undefined}
+                onPublish={onPublish ? () => onPublish(repo.path) : undefined}
+                onCheckout={onCheckout ? (branch) => onCheckout(repo.path, branch) : undefined}
+                isCheckingOut={isCheckingOut}
+              />
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+      </SmoothCollapse>
     </div>
   );
 }
