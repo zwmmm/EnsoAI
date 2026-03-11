@@ -30,6 +30,7 @@ import {
 import { addToast } from '@/components/ui/toast';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { useI18n } from '@/i18n';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import type { EditorTab, PendingCursor } from '@/stores/editor';
 import { useEditorStore } from '@/stores/editor';
 import { useSettingsStore } from '@/stores/settings';
@@ -72,7 +73,6 @@ interface EditorAreaProps {
   activeTabPath: string | null;
   pendingCursor: PendingCursor | null;
   rootPath?: string;
-  sessionId?: string | null;
   onTabClick: (path: string) => void;
   onTabClose: (path: string) => void | Promise<void>;
   onCloseOthers?: (keepPath: string) => void | Promise<void>;
@@ -97,7 +97,6 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     activeTabPath,
     pendingCursor,
     rootPath,
-    sessionId,
     onTabClick,
     onTabClose,
     onCloseOthers,
@@ -117,6 +116,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   ref: React.Ref<EditorAreaRef>
 ) {
   const { t } = useI18n();
+  const sessionId = useActiveSessionId(rootPath ?? null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const [editorInstance, setEditorInstance] = useState<monaco.editor.IStandaloneCodeEditor | null>(
@@ -236,7 +236,6 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     monacoInstance: monacoInstance,
     filePath: activeTabPath,
     rootPath: rootPath ?? null,
-    sessionId: sessionId ?? null,
     enabled: editorReady && !!sessionId,
   });
 

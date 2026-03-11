@@ -25,6 +25,7 @@ declare global {
 import { useEditor } from '@/hooks/useEditor';
 import { useFileTree } from '@/hooks/useFileTree';
 import { useWindowFocus } from '@/hooks/useWindowFocus';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import { type TerminalKeybinding, useSettingsStore } from '@/stores/settings';
 import { useTerminalWriteStore } from '@/stores/terminalWrite';
 import { EditorArea, type EditorAreaRef } from './EditorArea';
@@ -56,13 +57,13 @@ function matchesKeybinding(e: KeyboardEvent, binding: TerminalKeybinding): boole
 interface FilePanelProps {
   rootPath: string | undefined;
   isActive?: boolean;
-  sessionId?: string | null;
 }
 
 type NewItemType = 'file' | 'directory' | null;
 
-export function FilePanel({ rootPath, isActive = false, sessionId }: FilePanelProps) {
+export function FilePanel({ rootPath, isActive = false }: FilePanelProps) {
   const { t } = useI18n();
+  const sessionId = useActiveSessionId(rootPath);
   const {
     tree,
     isLoading,
@@ -798,7 +799,6 @@ export function FilePanel({ rootPath, isActive = false, sessionId }: FilePanelPr
           activeTabPath={activeTab?.path ?? null}
           pendingCursor={pendingCursor}
           rootPath={rootPath}
-          sessionId={sessionId}
           onTabClick={handleTabClick}
           onTabClose={handleTabClose}
           onCloseOthers={async (keepPath) => {

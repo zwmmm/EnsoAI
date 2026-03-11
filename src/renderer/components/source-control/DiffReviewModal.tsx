@@ -32,6 +32,7 @@ import { useSubmoduleChanges, useSubmoduleFileDiff, useSubmodules } from '@/hook
 import { useI18n } from '@/i18n';
 import { getXtermTheme, isTerminalThemeDark } from '@/lib/ghosttyTheme';
 import { cn } from '@/lib/utils';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import { useSettingsStore } from '@/stores/settings';
 import { useTerminalWriteStore } from '@/stores/terminalWrite';
 
@@ -41,7 +42,6 @@ interface DiffReviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rootPath: string | undefined;
-  sessionId: string | null;
   onSend?: () => void;
 }
 
@@ -285,14 +285,9 @@ function CommentItem({ comment, onDelete }: { comment: CommentData; onDelete: ()
   );
 }
 
-export function DiffReviewModal({
-  open,
-  onOpenChange,
-  rootPath,
-  sessionId,
-  onSend,
-}: DiffReviewModalProps) {
+export function DiffReviewModal({ open, onOpenChange, rootPath, onSend }: DiffReviewModalProps) {
   const { t } = useI18n();
+  const sessionId = useActiveSessionId(rootPath);
   const { terminalTheme, editorSettings } = useSettingsStore();
   const write = useTerminalWriteStore((state) => state.write);
   const focus = useTerminalWriteStore((state) => state.focus);

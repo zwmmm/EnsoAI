@@ -65,7 +65,6 @@ interface SourceControlPanelProps {
   isActive?: boolean;
   onExpandWorktree?: () => void;
   worktreeCollapsed?: boolean;
-  sessionId?: string | null;
 }
 
 export function SourceControlPanel({
@@ -73,7 +72,6 @@ export function SourceControlPanel({
   isActive = false,
   onExpandWorktree,
   worktreeCollapsed,
-  sessionId,
 }: SourceControlPanelProps) {
   const { t, tNode } = useI18n();
   const queryClient = useQueryClient();
@@ -967,7 +965,6 @@ export function SourceControlPanel({
                       : isFetching || fetchMutation.isPending
                   }
                   repoPath={selectedRepoPath}
-                  sessionId={sessionId}
                 />
               </div>
               {/* Commit Box */}
@@ -1061,7 +1058,6 @@ export function SourceControlPanel({
                 onNextFile={handleNextCommitFile}
                 hasPrevFile={currentCommitFileIndex > 0}
                 hasNextFile={currentCommitFileIndex < commitFiles.length - 1}
-                sessionId={sessionId}
               />
             </div>
           ) : selectedSubmoduleFile && rootPath ? (
@@ -1072,7 +1068,6 @@ export function SourceControlPanel({
                 diff={submoduleFileDiff ?? undefined}
                 skipFetch={true}
                 isActive={isActive}
-                sessionId={sessionId}
               />
             </div>
           ) : (
@@ -1085,7 +1080,6 @@ export function SourceControlPanel({
                 onNextFile={handleNextFile}
                 hasPrevFile={currentFileIndex > 0}
                 hasNextFile={currentFileIndex < allFiles.length - 1}
-                sessionId={sessionId}
               />
             </div>
           )}

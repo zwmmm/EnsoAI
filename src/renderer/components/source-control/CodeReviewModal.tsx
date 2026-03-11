@@ -41,6 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toastManager } from '@/components/ui/toast';
 import { useCodeReview } from '@/hooks/useCodeReview';
 import { useI18n } from '@/i18n';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import { stopCodeReview, useCodeReviewContinueStore } from '@/stores/codeReviewContinue';
 import { useSettingsStore } from '@/stores/settings';
 import { useTerminalWriteStore } from '@/stores/terminalWrite';
@@ -132,10 +133,10 @@ interface CodeReviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   repoPath: string | undefined;
-  sessionId?: string | null; // Current active chat session
 }
 
-export function CodeReviewModal({ open, onOpenChange, repoPath, sessionId }: CodeReviewModalProps) {
+export function CodeReviewModal({ open, onOpenChange, repoPath }: CodeReviewModalProps) {
+  const sessionId = useActiveSessionId(repoPath);
   const { t } = useI18n();
   const { content, status, error, startReview, reset } = useCodeReview({ repoPath });
   const codeReviewSettings = useSettingsStore((s) => s.codeReview);

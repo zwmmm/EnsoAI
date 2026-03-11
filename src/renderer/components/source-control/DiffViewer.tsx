@@ -27,6 +27,7 @@ import { useI18n } from '@/i18n';
 import { getXtermTheme, isTerminalThemeDark } from '@/lib/ghosttyTheme';
 import { matchesKeybinding } from '@/lib/keybinding';
 import { cn } from '@/lib/utils';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import { useNavigationStore } from '@/stores/navigation';
 import { useSettingsStore } from '@/stores/settings';
 import { useSourceControlStore } from '@/stores/sourceControl';
@@ -110,7 +111,6 @@ interface DiffViewerProps {
   diff?: { path: string; original: string; modified: string };
   skipFetch?: boolean;
   isCommitView?: boolean; // Add flag to indicate commit history view
-  sessionId?: string | null;
 }
 
 export function DiffViewer({
@@ -124,8 +124,8 @@ export function DiffViewer({
   diff: externalDiff,
   skipFetch = false,
   isCommitView = false,
-  sessionId,
 }: DiffViewerProps) {
+  const sessionId = useActiveSessionId(rootPath);
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { terminalTheme, sourceControlKeybindings, editorSettings } = useSettingsStore();

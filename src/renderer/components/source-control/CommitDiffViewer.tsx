@@ -14,7 +14,6 @@ interface CommitDiffViewerProps {
   onNextFile?: () => void;
   hasPrevFile?: boolean;
   hasNextFile?: boolean;
-  sessionId?: string | null;
 }
 
 export function CommitDiffViewer({
@@ -27,7 +26,6 @@ export function CommitDiffViewer({
   onNextFile,
   hasPrevFile = false,
   hasNextFile = false,
-  sessionId,
 }: CommitDiffViewerProps) {
   const { t } = useI18n();
 
@@ -70,7 +68,6 @@ export function CommitDiffViewer({
           onNextFile={onNextFile}
           hasPrevFile={hasPrevFile}
           hasNextFile={hasNextFile}
-          sessionId={sessionId}
         />
       </div>
     </div>

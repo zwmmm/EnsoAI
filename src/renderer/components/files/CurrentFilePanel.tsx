@@ -38,10 +38,9 @@ function matchesKeybinding(e: KeyboardEvent, binding: TerminalKeybinding): boole
 interface CurrentFilePanelProps {
   rootPath: string | undefined;
   isActive?: boolean;
-  sessionId?: string | null;
 }
 
-export function CurrentFilePanel({ rootPath, isActive = false, sessionId }: CurrentFilePanelProps) {
+export function CurrentFilePanel({ rootPath, isActive = false }: CurrentFilePanelProps) {
   const { t } = useI18n();
   const {
     tabs,
@@ -256,7 +255,6 @@ export function CurrentFilePanel({ rootPath, isActive = false, sessionId }: Curr
           activeTabPath={activeTab?.path ?? null}
           pendingCursor={pendingCursor}
           rootPath={rootPath}
-          sessionId={sessionId}
           onTabClick={handleTabClick}
           onTabClose={handleTabClose}
           onCloseOthers={async (keepPath) => {

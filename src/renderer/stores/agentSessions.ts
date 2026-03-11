@@ -511,6 +511,25 @@ export const useAgentSessionsStore = create<AgentSessionsState>()(
   }))
 );
 
+/**
+ * Selector hook: get active session ID for a given worktree path.
+ * Falls back to the first session under that cwd.
+ */
+export function useActiveSessionId(cwd: string | undefined | null): string | null {
+  return useAgentSessionsStore((state) => {
+    if (!cwd) return null;
+    const key = normalizePath(cwd);
+    const activeId = state.activeIds[key];
+    if (activeId) {
+      const session = state.sessions.find((s) => s.id === activeId);
+      if (session) return activeId;
+    }
+    // Fallback to first session for this cwd
+    const first = state.sessions.find((s) => normalizePath(s.cwd) === key);
+    return first?.id ?? null;
+  });
+}
+
 // Subscribe to state changes and persist to localStorage
 useAgentSessionsStore.subscribe(
   (state) => ({ sessions: state.sessions, activeIds: state.activeIds }),

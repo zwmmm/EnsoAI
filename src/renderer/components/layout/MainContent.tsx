@@ -508,17 +508,9 @@ export function MainContent({
           )}
         >
           {fileTreeDisplayMode === 'current' ? (
-            <CurrentFilePanel
-              rootPath={worktreePath}
-              isActive={activeTab === 'file'}
-              sessionId={activeSessionId}
-            />
+            <CurrentFilePanel rootPath={worktreePath} isActive={activeTab === 'file'} />
           ) : (
-            <FilePanel
-              rootPath={worktreePath}
-              isActive={activeTab === 'file'}
-              sessionId={activeSessionId}
-            />
+            <FilePanel rootPath={worktreePath} isActive={activeTab === 'file'} />
           )}
         </div>
         {/* Source Control tab - keep mounted to preserve selection state */}
@@ -534,7 +526,6 @@ export function MainContent({
             isActive={activeTab === 'source-control'}
             onExpandWorktree={onExpandWorktree}
             worktreeCollapsed={worktreeCollapsed}
-            sessionId={activeSessionId}
           />
         </div>
         {/* Todo tab */}
@@ -593,7 +584,6 @@ export function MainContent({
         open={isReviewModalOpen}
         onOpenChange={setIsReviewModalOpen}
         rootPath={worktreePath}
-        sessionId={activeSessionId}
         onSend={() => onTabChange('chat')}
       />
     </main>

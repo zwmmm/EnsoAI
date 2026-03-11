@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
+import { useActiveSessionId } from '@/stores/agentSessions';
 import { useTerminalWriteStore } from '@/stores/terminalWrite';
 
 type Monaco = typeof monaco;
@@ -101,7 +102,6 @@ interface UseEditorLineCommentOptions {
   monacoInstance: Monaco | null;
   filePath: string | null;
   rootPath: string | null;
-  sessionId: string | null;
   enabled?: boolean;
 }
 
@@ -110,9 +110,9 @@ export function useEditorLineComment({
   monacoInstance,
   filePath,
   rootPath,
-  sessionId,
   enabled = true,
 }: UseEditorLineCommentOptions) {
+  const sessionId = useActiveSessionId(rootPath);
   const { t } = useI18n();
   const write = useTerminalWriteStore((state) => state.write);
   const focus = useTerminalWriteStore((state) => state.focus);
