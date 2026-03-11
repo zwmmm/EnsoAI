@@ -3,6 +3,7 @@ import type {
   AIProvider,
   BuiltinAgentId,
   CustomAgent,
+  GitHostMapping,
   McpServer,
   PromptPreset,
   ProxySettings,
@@ -267,6 +268,16 @@ export interface QuickTerminalSettings {
 export type BackgroundSourceType = 'file' | 'folder' | 'url';
 export type BackgroundSizeMode = 'cover' | 'contain' | 'repeat' | 'center';
 
+// Git Clone settings
+export interface GitCloneSettings {
+  /** Base directory for cloned repositories */
+  baseDir: string;
+  /** Host-to-directory mappings */
+  hostMappings: GitHostMapping[];
+  /** Use organized structure (baseDir/host/owner/repo) or flat (baseDir/repo) */
+  useOrganizedStructure: boolean;
+}
+
 // Main settings state interface
 export interface SettingsState {
   // UI Settings
@@ -322,6 +333,9 @@ export interface SettingsState {
   defaultWorktreePath: string; // Default path for creating worktrees
   proxySettings: ProxySettings;
   autoCreateSessionOnActivate: boolean; // Auto-create agent/terminal session when worktree becomes active
+
+  // Git Clone Settings
+  gitClone: GitCloneSettings;
 
   // Beta features
   todoEnabled: boolean; // Enable Todo kanban board (Beta)
@@ -440,6 +454,15 @@ export interface SettingsState {
   setDefaultWorktreePath: (path: string) => void;
   setProxySettings: (settings: Partial<ProxySettings>) => void;
   setAutoCreateSessionOnActivate: (enabled: boolean) => void;
+
+  // Setters - Git Clone
+  setGitClone: (settings: Partial<GitCloneSettings>) => void;
+  addHostMapping: (mapping: import('@shared/types').GitHostMapping) => void;
+  removeHostMapping: (pattern: string) => void;
+  updateHostMapping: (
+    oldPattern: string,
+    updates: Partial<import('@shared/types').GitHostMapping>
+  ) => void;
 
   // Setters - Beta features
   setTodoEnabled: (enabled: boolean) => void;

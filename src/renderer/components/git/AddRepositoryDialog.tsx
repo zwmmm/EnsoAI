@@ -37,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n } from '@/i18n';
+import { generateClonePath } from '@/lib/gitClone';
 import { Z_INDEX } from '@/lib/z-index';
 import { useCloneTasksStore } from '@/stores/cloneTasks';
 import { useSettingsStore } from '@/stores/settings';
@@ -70,6 +71,7 @@ export function AddRepositoryDialog({
 }: AddRepositoryDialogProps) {
   const { t } = useI18n();
   const hideGroups = useSettingsStore((s) => s.hideGroups);
+  const gitClone = useSettingsStore((s) => s.gitClone);
 
   // Progress stage display labels (使用 t() 支持国际化，useMemo 避免重复创建)
   const stageLabels = React.useMemo<Record<string, string>>(
@@ -128,6 +130,7 @@ export function AddRepositoryDialog({
   const [targetDir, setTargetDir] = React.useState('');
   const [repoName, setRepoName] = React.useState('');
   const [isValidUrl, setIsValidUrl] = React.useState(false);
+  const targetDirUserModifiedRef = React.useRef(false);
 
   // Clone progress state
   const [isCloning, setIsCloning] = React.useState(false);
@@ -155,6 +158,8 @@ export function AddRepositoryDialog({
     if (!remoteUrl.trim()) {
       setIsValidUrl(false);
       setRepoName('');
+      setTargetDir('');
+      targetDirUserModifiedRef.current = false;
       return;
     }
 
@@ -164,6 +169,19 @@ export function AddRepositoryDialog({
         setIsValidUrl(result.valid);
         if (result.valid && result.repoName) {
           setRepoName(result.repoName);
+
+          // Auto-generate target directory using gitClone settings
+          const { targetDir: autoTargetDir } = generateClonePath(
+            remoteUrl.trim(),
+            gitClone.baseDir,
+            gitClone.hostMappings,
+            gitClone.useOrganizedStructure
+          );
+
+          // Only auto-fill if user hasn't manually set a target directory
+          if (!targetDirUserModifiedRef.current) {
+            setTargetDir(autoTargetDir);
+          }
         }
       } catch {
         setIsValidUrl(false);
@@ -173,7 +191,7 @@ export function AddRepositoryDialog({
     // Debounce validation
     const timer = setTimeout(validateUrl, 300);
     return () => clearTimeout(timer);
-  }, [remoteUrl]);
+  }, [remoteUrl, gitClone]);
 
   // Sync progress from store to local state for UI display
   React.useEffect(() => {
@@ -251,6 +269,7 @@ export function AddRepositoryDialog({
       const selectedPath = await window.electronAPI.dialog.openDirectory();
       if (selectedPath) {
         setTargetDir(selectedPath);
+        targetDirUserModifiedRef.current = true;
         setError(null);
       }
     } catch (err) {
@@ -376,6 +395,7 @@ export function AddRepositoryDialog({
     setTargetDir('');
     setRepoName('');
     setIsValidUrl(false);
+    targetDirUserModifiedRef.current = false;
     setError(null);
     setIsCloning(false);
     setCloneProgress(null);

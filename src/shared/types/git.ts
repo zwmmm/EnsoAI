@@ -153,3 +153,24 @@ export interface GitSubmodule {
   stagedCount: number;
   unstagedCount: number;
 }
+
+// Git Clone Directory Mapping types
+export interface GitHostMapping {
+  /** Git host domain pattern (supports wildcards, e.g., "*.github.com") */
+  pattern: string;
+  /** Directory name for this host */
+  dirname: string;
+}
+
+export interface ParsedGitUrl {
+  /** Protocol (https, ssh, git) */
+  protocol: string;
+  /** Host domain (e.g., github.com) */
+  host: string;
+  /** Owner/organization name */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Full path segments (owner, subgroups, repo) */
+  pathSegments: string[];
+}

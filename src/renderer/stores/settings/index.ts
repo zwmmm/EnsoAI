@@ -16,6 +16,7 @@ import {
   defaultCodeReviewSettings,
   defaultCommitMessageGeneratorSettings,
   defaultEditorSettings,
+  defaultGitCloneSettings,
   defaultGlobalKeybindings,
   defaultHapiSettings,
   defaultMainTabKeybindings,
@@ -147,6 +148,9 @@ function getInitialState() {
     defaultWorktreePath: '',
     proxySettings: defaultProxySettings,
     autoCreateSessionOnActivate: false,
+
+    // Git Clone Settings
+    gitClone: defaultGitCloneSettings,
 
     // Beta features
     todoEnabled: false,
@@ -465,6 +469,38 @@ export const useSettingsStore = create<SettingsState>()(
 
       setAutoCreateSessionOnActivate: (autoCreateSessionOnActivate) =>
         set({ autoCreateSessionOnActivate }),
+
+      // Git Clone Setters
+      setGitClone: (settings) =>
+        set((state) => ({
+          gitClone: { ...state.gitClone, ...settings },
+        })),
+
+      addHostMapping: (mapping) =>
+        set((state) => ({
+          gitClone: {
+            ...state.gitClone,
+            hostMappings: [...state.gitClone.hostMappings, mapping],
+          },
+        })),
+
+      removeHostMapping: (pattern) =>
+        set((state) => ({
+          gitClone: {
+            ...state.gitClone,
+            hostMappings: state.gitClone.hostMappings.filter((m) => m.pattern !== pattern),
+          },
+        })),
+
+      updateHostMapping: (oldPattern, updates) =>
+        set((state) => ({
+          gitClone: {
+            ...state.gitClone,
+            hostMappings: state.gitClone.hostMappings.map((m) =>
+              m.pattern === oldPattern ? { ...m, ...updates } : m
+            ),
+          },
+        })),
 
       // Beta Feature Setters
       setTodoEnabled: (todoEnabled) => set({ todoEnabled }),

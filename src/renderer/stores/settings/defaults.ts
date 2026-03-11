@@ -8,6 +8,7 @@ import type {
   CodeReviewSettings,
   CommitMessageGeneratorSettings,
   EditorSettings,
+  GitCloneSettings,
   GlobalKeybindings,
   HapiSettings,
   MainTabKeybindings,
@@ -401,3 +402,24 @@ export function getDefaultShellConfig(): import('@shared/types').ShellConfig {
         : 'system',
   };
 }
+
+/**
+ * Default Git clone settings
+ */
+export const defaultGitCloneSettings: GitCloneSettings = {
+  // Default to ~/ensoai/repos or similar
+  baseDir: '',
+  // Built-in host mappings for popular Git hosts
+  hostMappings: [
+    { pattern: 'github.com', dirname: 'github' },
+    { pattern: 'gitlab.com', dirname: 'gitlab' },
+    { pattern: 'bitbucket.org', dirname: 'bitbucket' },
+    { pattern: 'gitee.com', dirname: 'gitee' },
+    { pattern: 'gitea.com', dirname: 'gitea' },
+    { pattern: 'git.sr.ht', dirname: 'sourcehut' },
+    { pattern: 'codeberg.org', dirname: 'codeberg' },
+    { pattern: 'gitpod.io', dirname: 'gitpod' },
+  ],
+  // Use organized structure (baseDir/github.com/owner/repo) by default
+  useOrganizedStructure: true,
+};
