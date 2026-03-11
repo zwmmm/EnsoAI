@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, MenuItem, MenuPopup, MenuSeparator } from '@/components/ui/menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toastManager } from '@/components/ui/toast';
@@ -41,6 +41,7 @@ export function EditorTabs({
 }: EditorTabsProps) {
   const { t } = useI18n();
   const draggedIndexRef = useRef<number | null>(null);
+  const tabRefsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [menuTabPath, setMenuTabPath] = useState<string | null>(null);
@@ -72,6 +73,15 @@ export function EditorTabs({
     if (!menuTabPath) return -1;
     return tabs.findIndex((tab) => tab.path === menuTabPath);
   }, [tabs, menuTabPath]);
+
+  useEffect(() => {
+    if (!activeTabPath) return;
+    const frameId = requestAnimationFrame(() => {
+      const tabEl = tabRefsRef.current.get(activeTabPath);
+      tabEl?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [activeTabPath]);
 
   const canCloseOthers = !!onCloseOthers && !!menuTabPath && tabs.length > 1;
   const canCloseAll = !!onCloseAll && tabs.length > 0;
@@ -116,6 +126,10 @@ export function EditorTabs({
             return (
               <div
                 key={tab.path}
+                ref={(el) => {
+                  if (el) tabRefsRef.current.set(tab.path, el);
+                  else tabRefsRef.current.delete(tab.path);
+                }}
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
