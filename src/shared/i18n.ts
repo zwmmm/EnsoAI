@@ -1307,6 +1307,20 @@ export const zhTranslations: Record<string, string> = {
   'Launch Agent': '启动 Agent',
   'No tasks yet': '暂无任务',
   'Create your first task to get started': '创建第一个任务开始使用',
+  'AI Polish': 'AI 润色',
+  'Polish with AI': '使用 AI 润色',
+  'Failed to polish task': 'AI 润色失败',
+  'Todo AI Polish': '待办 AI 润色',
+  'Use AI to generate a title and description from raw requirement text':
+    '通过 AI 将原始需求文本生成简洁标题和 Agent 友好的内容',
+  'Enable AI Polish': '启用 AI 润色',
+  'Show AI polish button when creating or editing tasks': '新建或编辑任务时显示 AI 润色按钮',
+  'Model for polishing task content': '用于润色任务内容的模型',
+  'Customize the AI prompt for polishing tasks': '自定义任务润色的 AI 提示词',
+  'This will restore the default AI prompt for todo polish. Your custom prompt will be lost.':
+    '这将恢复待办润色的默认 AI 提示词，自定义提示词将会丢失。',
+  'Enter a prompt template.\nAvailable variables:\n• {text} - Raw requirement text':
+    '输入提示词模板。\n可用变量：\n• {text} - 原始需求文本',
 };
 
 export function normalizeLocale(input?: string): Locale {

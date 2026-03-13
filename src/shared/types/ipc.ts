@@ -259,6 +259,7 @@ export const IPC_CHANNELS = {
   TODO_MOVE_TASK: 'todo:moveTask',
   TODO_REORDER_TASKS: 'todo:reorderTasks',
   TODO_MIGRATE: 'todo:migrate',
+  TODO_AI_POLISH: 'todo:aiPolish',
 
   // Logging
   LOG_UPDATE_CONFIG: 'log:update-config',

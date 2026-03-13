@@ -23,6 +23,7 @@ import {
   defaultQuickTerminalSettings,
   defaultSearchKeybindings,
   defaultSourceControlKeybindings,
+  defaultTodoPolishSettings,
   defaultWorkspaceKeybindings,
   defaultXtermKeybindings,
   getDefaultLocale,
@@ -140,6 +141,7 @@ function getInitialState() {
     commitMessageGenerator: defaultCommitMessageGeneratorSettings,
     codeReview: defaultCodeReviewSettings,
     branchNameGenerator: defaultBranchNameGeneratorSettings,
+    todoPolish: defaultTodoPolishSettings,
 
     // App Settings
     autoUpdateEnabled: true,
@@ -440,6 +442,11 @@ export const useSettingsStore = create<SettingsState>()(
       setBranchNameGenerator: (settings) =>
         set((state) => ({
           branchNameGenerator: { ...state.branchNameGenerator, ...settings },
+        })),
+
+      setTodoPolish: (settings) =>
+        set((state) => ({
+          todoPolish: { ...state.todoPolish, ...settings },
         })),
 
       // App Setters

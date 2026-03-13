@@ -186,6 +186,10 @@ export function migrateSettings(
       ...currentState.branchNameGenerator,
       ...persisted.branchNameGenerator,
     },
+    todoPolish: {
+      ...currentState.todoPolish,
+      ...persisted.todoPolish,
+    },
     hapiSettings: {
       ...currentState.hapiSettings,
       ...persisted.hapiSettings,
