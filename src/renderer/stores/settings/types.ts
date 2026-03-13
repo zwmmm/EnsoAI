@@ -208,6 +208,16 @@ export interface CommitMessageGeneratorSettings {
   prompt: string; // Custom prompt template
 }
 
+// Todo AI polish settings
+export interface TodoPolishSettings {
+  enabled: boolean;
+  provider: AIProvider;
+  model: string; // Dynamic based on provider
+  reasoningEffort?: ReasoningEffort; // For Codex CLI
+  timeout: number; // in seconds
+  prompt: string; // Custom prompt template (with {text} placeholder)
+}
+
 // Branch name generator settings
 export interface BranchNameGeneratorSettings {
   enabled: boolean;
@@ -326,6 +336,7 @@ export interface SettingsState {
   commitMessageGenerator: CommitMessageGeneratorSettings;
   codeReview: CodeReviewSettings;
   branchNameGenerator: BranchNameGeneratorSettings;
+  todoPolish: TodoPolishSettings;
 
   // App Settings
   autoUpdateEnabled: boolean;
@@ -447,6 +458,7 @@ export interface SettingsState {
   setCommitMessageGenerator: (settings: Partial<CommitMessageGeneratorSettings>) => void;
   setCodeReview: (settings: Partial<CodeReviewSettings>) => void;
   setBranchNameGenerator: (settings: Partial<BranchNameGeneratorSettings>) => void;
+  setTodoPolish: (settings: Partial<TodoPolishSettings>) => void;
 
   // Setters - App
   setAutoUpdateEnabled: (enabled: boolean) => void;
