@@ -550,6 +550,15 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.TODO_REORDER_TASKS, repoPath, status, orderedIds),
     migrate: (boardsJson: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.TODO_MIGRATE, boardsJson),
+    aiPolish: (options: {
+      text: string;
+      timeout: number;
+      provider: string;
+      model: string;
+      reasoningEffort?: string;
+      prompt?: string;
+    }): Promise<{ success: boolean; title?: string; description?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TODO_AI_POLISH, options),
   },
 
   // Environment
