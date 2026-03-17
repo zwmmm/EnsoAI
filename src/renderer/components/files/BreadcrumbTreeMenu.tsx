@@ -36,6 +36,35 @@ const togglePathInSet = (set: Set<string>, path: string): Set<string> => {
   return newSet;
 };
 
+// Helper function to recursively find a node in the tree
+function findNodeInTree(nodes: TreeNode[], path: string): TreeNode | undefined {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.children) {
+      const found = findNodeInTree(node.children, path);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+// Helper function to recursively update a node in the tree
+function updateNodeInTree(
+  nodes: TreeNode[],
+  path: string,
+  updater: (node: TreeNode) => TreeNode
+): TreeNode[] {
+  return nodes.map((node) => {
+    if (node.path === path) {
+      return updater(node);
+    }
+    if (node.children) {
+      return { ...node, children: updateNodeInTree(node.children, path, updater) };
+    }
+    return node;
+  });
+}
+
 export function BreadcrumbTreeMenu({
   children,
   dirPath,
@@ -61,28 +90,22 @@ export function BreadcrumbTreeMenu({
     expandedPathsRef.current = expandedPaths;
   }, [expandedPaths]);
 
-  // Determine if dirPath is a file or directory by checking breadcrumb context
-  // The last segment in breadcrumb is always the active file, show its parent's contents
+  // Determine which directory to list: always show parent directory's contents
+  // This ensures clicking any breadcrumb segment shows its sibling items
   const { listPath } = useMemo(() => {
     if (!dirPath) return { listPath: dirPath };
 
-    // Check if this path is the active file (last breadcrumb segment)
-    const isActiveFile = activeTabPath === dirPath;
+    // For all segments (file or directory), show parent directory's contents
+    // This displays siblings at the same level as the clicked segment
+    const parts = dirPath.split('/');
+    parts.pop(); // Remove last segment (file or directory name)
+    const parentDir = parts.join('/');
 
-    if (isActiveFile) {
-      // For the file segment, show parent directory's contents
-      const parts = dirPath.split('/');
-      parts.pop(); // Remove file name
-      const parentDir = parts.join('/');
-      return {
-        listPath: parentDir || dirPath, // Fallback to dirPath if no parent
-      };
-    }
-
+    // If no parent, use the path itself (root level)
     return {
-      listPath: dirPath,
+      listPath: parentDir || dirPath,
     };
-  }, [dirPath, activeTabPath]);
+  }, [dirPath]);
 
   // Fetch directory contents - reuse file tree cache by using same queryKey
   const { data: entries = [], isLoading } = useQuery({
@@ -137,24 +160,29 @@ export function BreadcrumbTreeMenu({
       setExpandedPaths(newExpanded);
 
       // Load children if expanding and not already loaded
-      const node = treeRef.current.find((n) => n.path === path);
+      const node = findNodeInTree(treeRef.current, path);
       if (node && !node.children && !expandedPathsRef.current.has(path)) {
-        setTree((current) => current.map((n) => (n.path === path ? { ...n, isLoading: true } : n)));
+        // Use recursive update to set loading state
+        setTree((current) => updateNodeInTree(current, path, (n) => ({ ...n, isLoading: true })));
 
         try {
           const children = await loadChildren(path);
           const childNodes = children.map((c) => ({ ...c })) as TreeNode[];
 
+          // Use recursive update to add children
           setTree((current) =>
-            current.map((n) =>
-              n.path === path ? { ...n, children: childNodes, isLoading: false } : n
-            )
+            updateNodeInTree(current, path, (n) => ({
+              ...n,
+              children: childNodes,
+              isLoading: false,
+            }))
           );
         } catch (_error) {
           // Remove from expanded on error using helper
           setExpandedPaths((prev) => togglePathInSet(prev, path));
+          // Use recursive update to clear loading state
           setTree((current) =>
-            current.map((n) => (n.path === path ? { ...n, isLoading: false } : n))
+            updateNodeInTree(current, path, (n) => ({ ...n, isLoading: false }))
           );
         }
       }

@@ -12,7 +12,12 @@ import {
 } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { normalizePath } from '@/App/storage';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import {
   Empty,
   EmptyDescription,
@@ -245,7 +250,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   });
 
   // Wrap onSave to refresh blame after save
-  const _handleSaveWithBlameRefresh = useCallback(
+  const handleSaveWithBlameRefresh = useCallback(
     (path: string) => {
       onSave(path);
       // Refresh blame after file is saved
@@ -316,7 +321,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       const handleBlur = () => {
         const path = activeTabPathRef.current;
         if (path && hasPendingAutoSaveRef.current) {
-          onSave(path);
+          handleSaveWithBlameRefresh(path);
           hasPendingAutoSaveRef.current = false;
         }
       };
@@ -329,7 +334,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         blurDisposableRef.current = null;
       }
     };
-  }, [editorSettings.autoSave, onSave]);
+  }, [editorSettings.autoSave, handleSaveWithBlameRefresh]);
 
   // Auto save: Save on window focus change
   useEffect(() => {
@@ -339,14 +344,14 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         editorSettings.autoSave === 'onWindowChange' &&
         hasPendingAutoSaveRef.current
       ) {
-        onSave(activeTabPath);
+        handleSaveWithBlameRefresh(activeTabPath);
         hasPendingAutoSaveRef.current = false;
       }
     };
 
     window.addEventListener('blur', handleWindowBlur);
     return () => window.removeEventListener('blur', handleWindowBlur);
-  }, [activeTabPath, editorSettings.autoSave, onSave]);
+  }, [activeTabPath, editorSettings.autoSave, handleSaveWithBlameRefresh]);
 
   // Listen for external file changes and update open tabs
   useEffect(() => {
@@ -493,7 +498,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       // Add Cmd/Ctrl+S shortcut
       editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyS, () => {
         if (activeTabPath) {
-          onSave(activeTabPath);
+          handleSaveWithBlameRefresh(activeTabPath);
         }
       });
 
@@ -605,7 +610,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     [
       activeTab?.viewState,
       activeTabPath,
-      onSave,
+      handleSaveWithBlameRefresh,
       onGlobalSearch,
       onClearPendingCursor,
       getRelativePath,
@@ -904,13 +909,19 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         // Trigger auto save based on mode
         if (editorSettings.autoSave === 'afterDelay') {
           triggerDebouncedSave(activeTabPath, (path) => {
-            onSave(path);
+            handleSaveWithBlameRefresh(path);
             hasPendingAutoSaveRef.current = false;
           });
         }
       }
     },
-    [activeTabPath, onContentChange, editorSettings.autoSave, triggerDebouncedSave, onSave]
+    [
+      activeTabPath,
+      onContentChange,
+      editorSettings.autoSave,
+      triggerDebouncedSave,
+      handleSaveWithBlameRefresh,
+    ]
   );
 
   const handleTabClose = useCallback(
