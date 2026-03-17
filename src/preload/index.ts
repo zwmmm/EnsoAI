@@ -128,6 +128,10 @@ const electronAPI = {
       filePath: string
     ): Promise<import('@shared/types').GitBlameLineInfo[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BLAME, workdir, filePath),
+    revert: (workdir: string, commitHash: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_REVERT, workdir, commitHash),
+    reset: (workdir: string, commitHash: string, mode?: 'soft' | 'mixed' | 'hard'): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_RESET, workdir, commitHash, mode),
     generateCommitMessage: (
       workdir: string,
       options: {

@@ -393,6 +393,21 @@ export function registerGitHandlers(): void {
     return git.blame(filePath);
   });
 
+  // Git Revert
+  ipcMain.handle(IPC_CHANNELS.GIT_REVERT, async (_, workdir: string, commitHash: string) => {
+    const git = getGitService(workdir);
+    await git.revert(commitHash);
+  });
+
+  // Git Reset
+  ipcMain.handle(
+    IPC_CHANNELS.GIT_RESET,
+    async (_, workdir: string, commitHash: string, mode?: 'soft' | 'mixed' | 'hard') => {
+      const git = getGitService(workdir);
+      await git.reset(commitHash, mode);
+    }
+  );
+
   // Git Auto Fetch
   ipcMain.handle(IPC_CHANNELS.GIT_AUTO_FETCH_SET_ENABLED, async (_, enabled: boolean) => {
     gitAutoFetchService.setEnabled(enabled);

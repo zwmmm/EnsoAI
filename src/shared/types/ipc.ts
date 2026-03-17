@@ -34,6 +34,9 @@ export const IPC_CHANNELS = {
   GIT_VALIDATE_URL: 'git:validate-url',
   // Git Blame
   GIT_BLAME: 'git:blame',
+  // Git Revert & Reset
+  GIT_REVERT: 'git:revert',
+  GIT_RESET: 'git:reset',
 
   // Git Auto Fetch
   GIT_AUTO_FETCH_SET_ENABLED: 'git:autoFetch:setEnabled',

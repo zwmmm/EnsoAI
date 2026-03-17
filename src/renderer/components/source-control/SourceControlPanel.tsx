@@ -1068,6 +1068,7 @@ export function SourceControlPanel({
                   commitFilesLoading={commitFilesLoading}
                   selectedFile={selectedCommitFile}
                   onFileClick={handleCommitFileClick}
+                  workdir={selectedRepoPath ?? rootPath ?? undefined}
                 />
               </div>
             </div>

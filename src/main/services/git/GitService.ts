@@ -1484,7 +1484,7 @@ export class GitService {
       for (const submodule of sortedSubmodules) {
         const subPath = submodule.path.replace(/\\/g, '/');
         // Check if the file is within this submodule
-        if (normalizedFilePath.startsWith(subPath + '/') || normalizedFilePath === subPath) {
+        if (normalizedFilePath.startsWith(`${subPath}/`) || normalizedFilePath === subPath) {
           return subPath;
         }
       }
@@ -1638,5 +1638,23 @@ export class GitService {
     }
 
     return results;
+  }
+
+  /**
+   * Revert a commit by creating a new commit that undoes the changes
+   * @param commitHash - The commit hash to revert
+   */
+  async revert(commitHash: string): Promise<void> {
+    await this.git.revert(commitHash, ['--no-edit']);
+  }
+
+  /**
+   * Reset the current HEAD to the specified state
+   * @param commitHash - The target commit hash
+   * @param mode - Reset mode: 'soft', 'mixed', or 'hard'
+   */
+  async reset(commitHash: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed'): Promise<void> {
+    const modeFlag = mode === 'mixed' ? '--mixed' : `--${mode}`;
+    await this.git.reset([modeFlag, commitHash]);
   }
 }
