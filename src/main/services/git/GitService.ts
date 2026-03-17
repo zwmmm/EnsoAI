@@ -1654,7 +1654,6 @@ export class GitService {
    * @param mode - Reset mode: 'soft', 'mixed', or 'hard'
    */
   async reset(commitHash: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed'): Promise<void> {
-    const modeFlag = mode === 'mixed' ? '--mixed' : `--${mode}`;
-    await this.git.reset([modeFlag, commitHash]);
+    await this.git.reset([`--${mode}`, commitHash]);
   }
 }

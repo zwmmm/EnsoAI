@@ -14,8 +14,8 @@ export type ResetMode = 'soft' | 'mixed' | 'hard';
 
 interface ResetModeOption {
   value: ResetMode;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   color: string;
   hoverBorder: string;
 }
@@ -23,22 +23,22 @@ interface ResetModeOption {
 const RESET_MODES: ResetModeOption[] = [
   {
     value: 'soft',
-    label: 'Soft',
-    description: 'Keep changes unstaged',
+    labelKey: 'Soft Reset',
+    descriptionKey: 'Keep all changes as unstaged',
     color: 'text-blue-500',
     hoverBorder: 'hover:border-blue-500/50',
   },
   {
     value: 'mixed',
-    label: 'Mixed',
-    description: 'Unstage changes',
+    labelKey: 'Mixed Reset',
+    descriptionKey: 'Unstage all changes',
     color: 'text-orange-500',
     hoverBorder: 'hover:border-orange-500/50',
   },
   {
     value: 'hard',
-    label: 'Hard',
-    description: 'Discard all changes',
+    labelKey: 'Hard Reset',
+    descriptionKey: 'Discard all changes',
     color: 'text-red-500',
     hoverBorder: 'hover:border-red-500/50',
   },
@@ -86,8 +86,8 @@ export function ResetModeDialog({
             >
               <span className={cn('h-2 w-2 rounded-full', mode.color.replace('text-', 'bg-'))} />
               <div className="min-w-0 flex-1">
-                <div className={cn('text-sm font-medium', mode.color)}>{mode.label}</div>
-                <div className="text-xs text-muted-foreground">{mode.description}</div>
+                <div className={cn('text-sm font-medium', mode.color)}>{t(mode.labelKey)}</div>
+                <div className="text-xs text-muted-foreground">{t(mode.descriptionKey)}</div>
               </div>
             </button>
           ))}

@@ -33,7 +33,14 @@ interface CommitHistoryListProps {
   onFileClick?: (filePath: string) => void;
   // Git operations
   workdir?: string;
+  onRefresh?: () => void;
 }
+
+const RESET_MODE_LABELS: Record<ResetMode, string> = {
+  soft: 'Soft Reset',
+  mixed: 'Mixed Reset',
+  hard: 'Hard Reset',
+};
 
 export function CommitHistoryList({
   commits,
@@ -49,6 +56,7 @@ export function CommitHistoryList({
   selectedFile,
   onFileClick,
   workdir,
+  onRefresh,
 }: CommitHistoryListProps) {
   const { t, locale } = useI18n();
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -106,8 +114,7 @@ export function CommitHistoryList({
         type: 'success',
         timeout: 3000,
       });
-      // Refresh the page to show updated status
-      window.location.reload();
+      onRefresh?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       toastManager.add({
@@ -117,7 +124,7 @@ export function CommitHistoryList({
         timeout: 5000,
       });
     }
-  }, [contextMenu.commit, workdir, closeContextMenu, t]);
+  }, [contextMenu.commit, workdir, closeContextMenu, t, onRefresh]);
 
   const handleResetClick = useCallback(() => {
     if (!contextMenu.commit) return;
@@ -133,12 +140,11 @@ export function CommitHistoryList({
         await window.electronAPI.git.reset(workdir, resetDialog.commit.hash, mode);
         toastManager.add({
           title: t('Reset successful'),
-          description: t('Reset to {{mode}} mode', { mode }),
+          description: t('Reset to {{mode}} mode', { mode: t(RESET_MODE_LABELS[mode]) }),
           type: 'success',
           timeout: 3000,
         });
-        // Refresh the page to show updated status
-        window.location.reload();
+        onRefresh?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         toastManager.add({
@@ -149,7 +155,7 @@ export function CommitHistoryList({
         });
       }
     },
-    [resetDialog.commit, workdir, t]
+    [resetDialog.commit, workdir, t, onRefresh]
   );
 
   const handleResetCancel = useCallback(() => {
@@ -159,18 +165,21 @@ export function CommitHistoryList({
   // Adjust context menu position to prevent overflow
   useLayoutEffect(() => {
     if (!contextMenu.open || !contextMenuRef.current) return;
-    const rect = contextMenuRef.current.getBoundingClientRect();
-    let { x, y } = contextMenu.position;
+    const el = contextMenuRef.current;
+    const rect = el.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    if (y + rect.height > viewportHeight - 8) {
+    let { x, y } = contextMenu.position;
+
+    if (rect.bottom > viewportHeight - 8) {
       y = Math.max(8, viewportHeight - rect.height - 8);
     }
-    if (x + rect.width > viewportWidth - 8) {
+    if (rect.right > viewportWidth - 8) {
       x = Math.max(8, viewportWidth - rect.width - 8);
     }
     if (x !== contextMenu.position.x || y !== contextMenu.position.y) {
-      setContextMenu((prev) => ({ ...prev, position: { x, y } }));
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
     }
   }, [contextMenu.open, contextMenu.position]);
 
