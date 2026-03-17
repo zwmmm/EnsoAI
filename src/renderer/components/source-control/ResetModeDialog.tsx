@@ -24,7 +24,7 @@ const RESET_MODES: ResetModeOption[] = [
   {
     value: 'soft',
     labelKey: 'Soft Reset',
-    descriptionKey: 'Keep all changes as unstaged',
+    descriptionKey: 'Keep all changes staged',
     color: 'text-blue-500',
     hoverBorder: 'hover:border-blue-500/50',
   },

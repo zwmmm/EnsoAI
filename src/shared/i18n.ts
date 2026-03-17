@@ -143,7 +143,7 @@ export const zhTranslations: Record<string, string> = {
   'Soft Reset': '软重置',
   'Mixed Reset': '混合重置',
   'Hard Reset': '硬重置',
-  'Keep all changes as unstaged': '保留所有更改（未暂存）',
+  'Keep all changes staged': '保留所有更改（已暂存）',
   'Unstage all changes': '取消暂存所有更改',
   'Revert successful': 'Revert 成功',
   'Revert failed': 'Revert 失败',
