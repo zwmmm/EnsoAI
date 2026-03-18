@@ -75,7 +75,6 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { GlowBorder, type GlowState, useGlowEffectEnabled } from '@/components/ui/glow-card';
-import { RepoItemWithGlow } from '@/components/ui/glow-wrappers';
 import { toastManager } from '@/components/ui/toast';
 import { CreateWorktreeDialog } from '@/components/worktree/CreateWorktreeDialog';
 import { useGitSync } from '@/hooks/useGitSync';
@@ -1700,7 +1699,7 @@ function WorktreeTreeItem({
   }, [isActive, activityState, worktree.path]);
 
   // Check if any session in this worktree has outputting or unread state
-  const outputState = useWorktreeOutputState(worktree.path);
+  const _outputState = useWorktreeOutputState(worktree.path);
 
   // Git sync operations
   const {

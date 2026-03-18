@@ -1080,6 +1080,12 @@ export function SourceControlPanel({
                   commitFilesLoading={commitFilesLoading}
                   selectedFile={selectedCommitFile}
                   onFileClick={handleCommitFileClick}
+                  workdir={selectedRepoPath ?? rootPath ?? undefined}
+                  onRefresh={() => {
+                    refetch();
+                    refetchCommits();
+                    refetchStatus();
+                  }}
                 />
               </div>
             </div>
