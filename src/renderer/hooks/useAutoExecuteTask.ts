@@ -4,6 +4,17 @@ import type { ResolvedAgent } from '@/components/todo/useEnabledAgents';
 import { useAgentSessionsStore } from '@/stores/agentSessions';
 import { INITIAL_AUTO_EXECUTE, useTodoStore } from '@/stores/todo';
 
+/**
+ * Find the UI session ID matching a Claude CLI session ID.
+ * Claude CLI session ID (from hooks) differs from our UI session ID (crypto.randomUUID).
+ */
+function findUISessionId(cliSessionId: string): string | undefined {
+  const session = useAgentSessionsStore
+    .getState()
+    .sessions.find((s) => s.sessionId === cliSessionId || s.id === cliSessionId);
+  return session?.id;
+}
+
 // Re-export for convenience
 export { TASK_COMPLETION_MARKER };
 
@@ -50,6 +61,7 @@ export function useAutoExecuteTask(
   const executeTask = useCallback(
     (taskId: string) => {
       if (!worktreePath || !enabledAgents || enabledAgents.length === 0) {
+        stopAutoExecute(repoPath);
         return;
       }
 
@@ -137,25 +149,29 @@ export function useAutoExecuteTask(
         useTodoStore.getState().autoExecute[repoPath] ?? INITIAL_AUTO_EXECUTE;
 
       if (!worktreePath || !currentAutoExecute.running) return;
-      if (data.sessionId !== currentAutoExecute.currentSessionId) return;
+
+      // Match CLI session ID to our UI session ID
+      const uiSessionId = findUISessionId(data.sessionId);
+      if (uiSessionId !== currentAutoExecute.currentSessionId) return;
 
       const currentTaskId = currentAutoExecute.currentTaskId;
       if (!currentTaskId) return;
 
-      // Check task completion status
-      if (data.taskCompletionStatus === 'completed') {
-        // Task completed successfully - mark as done and advance
-        updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
-
-        const nextTaskId = advanceQueue(repoPath);
-        if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
-          executeTaskRef.current(nextTaskId);
-        } else {
-          stopAutoExecute(repoPath);
-        }
-      } else {
-        // Task failed or unknown - stop auto-execute, reset task to todo
+      // Agent stopped - treat as done unless explicitly failed.
+      // 'unknown' means we couldn't detect the marker, but the agent did finish.
+      if (data.taskCompletionStatus === 'failed') {
         updateTask(repoPath, currentTaskId, { status: 'todo', sessionId: undefined });
+        stopAutoExecute(repoPath);
+        return;
+      }
+
+      // completed or unknown - mark done and advance
+      updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
+
+      const nextTaskId = advanceQueue(repoPath);
+      if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
+        executeTaskRef.current(nextTaskId);
+      } else {
         stopAutoExecute(repoPath);
       }
     },

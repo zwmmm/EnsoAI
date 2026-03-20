@@ -206,7 +206,6 @@ export const useTodoStore = create<TodoState>()(
     // Auto-Execute Actions
     startAutoExecute: (repoPath, taskIds) => {
       const key = getKey(repoPath);
-      if (taskIds.length === 0) return;
 
       set((state) => ({
         autoExecute: {

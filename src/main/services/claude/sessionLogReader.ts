@@ -43,6 +43,41 @@ interface SessionLogEntry {
 }
 
 /**
+ * Read the last N lines from a file by reading a small tail chunk.
+ * Avoids loading the entire file into memory.
+ */
+async function readTailLines(filePath: string, lineCount: number): Promise<string[]> {
+  const CHUNK_SIZE = 8 * 1024; // 8KB per read, enough for ~3 JSONL lines
+  const handle = await fs.open(filePath, 'r');
+  try {
+    const stat = await handle.stat();
+    const fileSize = stat.size;
+    if (fileSize === 0) return [];
+
+    let collected = '';
+    let position = fileSize;
+
+    while (position > 0) {
+      const readSize = Math.min(CHUNK_SIZE, position);
+      position -= readSize;
+      const buffer = Buffer.alloc(readSize);
+      await handle.read(buffer, 0, readSize, position);
+      collected = buffer.toString('utf-8') + collected;
+
+      // +1 to account for a possible trailing newline
+      const lines = collected.split('\n').filter((l) => l.trim());
+      if (lines.length >= lineCount) {
+        return lines.slice(-lineCount);
+      }
+    }
+
+    return collected.split('\n').filter((l) => l.trim());
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * Read the last N assistant text messages from a session log file
  * Returns empty array if file doesn't exist or on error
  */
@@ -54,17 +89,16 @@ export async function readLastAssistantMessages(
   const logPath = getSessionLogPath(cwd, sessionId);
 
   try {
-    const fileContent = await fs.readFile(logPath, 'utf-8');
-    const lines = fileContent.trim().split('\n');
+    // Read more lines than needed since not every line is an assistant message
+    const tailLines = await readTailLines(logPath, count * 10);
     const messages: string[] = [];
 
     // Read from end to get most recent messages
-    for (let i = lines.length - 1; i >= 0 && messages.length < count; i--) {
+    for (let i = tailLines.length - 1; i >= 0 && messages.length < count; i--) {
       try {
-        const entry: SessionLogEntry = JSON.parse(lines[i]);
+        const entry: SessionLogEntry = JSON.parse(tailLines[i]);
 
         if (entry.type === 'assistant' && entry.message?.content) {
-          // Extract text content from the message
           const textContent = entry.message.content
             .filter((c) => c.type === 'text' && c.text)
             .map((c) => c.text)
@@ -81,7 +115,6 @@ export async function readLastAssistantMessages(
 
     return messages;
   } catch (error) {
-    // File doesn't exist or can't be read - return empty array
     const nodeError = error as NodeJS.ErrnoException;
     if (nodeError.code !== 'ENOENT') {
       console.error('[SessionLogReader] Failed to read session log:', error);

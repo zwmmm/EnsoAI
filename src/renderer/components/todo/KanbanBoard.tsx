@@ -261,8 +261,14 @@ export function KanbanBoard({ repoPath, worktreePath, onSwitchToAgent }: KanbanB
               size="sm"
               className="h-7 gap-1 text-xs"
               onClick={handleStartAutoExecute}
-              disabled={todoTasks.length === 0 || enabledAgents.length === 0}
-              title={enabledAgents.length === 0 ? t('No enabled agents') : undefined}
+              disabled={todoTasks.length === 0 || enabledAgents.length === 0 || !worktreePath}
+              title={
+                !worktreePath
+                  ? t('Please select a worktree first')
+                  : enabledAgents.length === 0
+                    ? t('No enabled agents')
+                    : undefined
+              }
             >
               <ListOrdered className="h-3.5 w-3.5" />
               {t('Auto Execute')}

@@ -330,6 +330,8 @@ export function AgentTerminal({
           .replace(/\\/g, '\\\\')
           .replace(/"/g, '\\"')
           .replace(/`/g, '``')
+          .replace(/%/g, '%%') // cmd variable expansion
+          .replace(/\$/g, '`$') // PowerShell variable expansion
           .replace(/\n/g, ' '); // Replace newlines with spaces for Windows
         agentArgs.push(`"${escaped}"`);
       } else {
