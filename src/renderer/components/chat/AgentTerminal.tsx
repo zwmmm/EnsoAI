@@ -390,6 +390,8 @@ export function AgentTerminal({
       };
     }
 
+    // Safe: all interpolated values (effectiveCommand, agentArgs, tmuxSessionName) are
+    // derived from internal app config / controlled constants, not from arbitrary user input.
     const fullCommand = `${effectiveCommand} ${agentArgs.join(' ')}`.trim();
     const shellName = resolvedShell.shell.toLowerCase();
 

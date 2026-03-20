@@ -140,14 +140,18 @@ export function useAutoExecuteTask(
       const currentTaskId = currentAutoExecute.currentTaskId;
       if (!currentTaskId) return;
 
-      // Agent stopped - mark done and advance.
-      // 'unknown' means we couldn't detect the marker, but the agent did finish.
-      updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
-
-      const nextTaskId = advanceQueue(repoPath);
-      if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
-        executeTaskRef.current(nextTaskId);
+      if (data.taskCompletionStatus === 'completed') {
+        // Completion marker detected - mark done and advance
+        updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
+        const nextTaskId = advanceQueue(repoPath);
+        if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
+          executeTaskRef.current(nextTaskId);
+        } else {
+          stopAutoExecute(repoPath);
+        }
       } else {
+        // No completion marker - revert task and stop
+        updateTask(repoPath, currentTaskId, { status: 'todo', sessionId: undefined });
         stopAutoExecute(repoPath);
       }
     },
