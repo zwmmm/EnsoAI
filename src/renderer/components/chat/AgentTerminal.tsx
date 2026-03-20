@@ -321,14 +321,26 @@ export function AgentTerminal({
     // Append initial prompt as CLI positional argument (for auto-execute)
     // Most CLI agents (claude, codex, gemini, etc.) accept a prompt as trailing argument
     if (initialPrompt) {
-      // Shell-safe quoting using $'...' ANSI-C quoting syntax (bash/zsh compatible)
-      // This handles: backslashes, single quotes, and newlines
-      // Note: $'...' is bash/zsh specific; for sh/ash compatibility, consider a shell-escape library
-      const escaped = initialPrompt
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'")
-        .replace(/\n/g, '\\n');
-      agentArgs.push(`$'${escaped}'`);
+      const isWindows = window.electronAPI?.env?.platform === 'win32';
+
+      if (isWindows) {
+        // Windows: use double quotes with PowerShell/cmd compatible escaping
+        // Escape: backslashes (double them), double quotes (backslash), backticks (PowerShell)
+        const escaped = initialPrompt
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/`/g, '``')
+          .replace(/\n/g, ' '); // Replace newlines with spaces for Windows
+        agentArgs.push(`"${escaped}"`);
+      } else {
+        // Unix: use $'...' ANSI-C quoting syntax (bash/zsh compatible)
+        // This handles: backslashes, single quotes, and newlines
+        const escaped = initialPrompt
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/\n/g, '\\n');
+        agentArgs.push(`$'${escaped}'`);
+      }
     }
 
     const isWindows = window.electronAPI?.env?.platform === 'win32';

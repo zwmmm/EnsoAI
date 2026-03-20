@@ -243,7 +243,7 @@ export function KanbanBoard({ repoPath, worktreePath, onSwitchToAgent }: KanbanB
               <span className="text-xs text-muted-foreground">
                 {autoExecute.currentTaskId
                   ? t('Executing...')
-                  : t('Queue: {count}', { count: autoExecute.queue.length })}
+                  : t('Queue: {{count}}', { count: autoExecute.queue.length })}
               </span>
               <Button
                 variant="ghost"
@@ -296,7 +296,7 @@ export function KanbanBoard({ repoPath, worktreePath, onSwitchToAgent }: KanbanB
               })}
               {autoExecute.queue.length > 5 && (
                 <span className="text-muted-foreground">
-                  +{t('{count} more', { count: autoExecute.queue.length - 5 })}
+                  +{t('{{count}} more', { count: autoExecute.queue.length - 5 })}
                 </span>
               )}
             </div>

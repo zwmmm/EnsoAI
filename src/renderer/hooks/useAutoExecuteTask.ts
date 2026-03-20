@@ -17,10 +17,10 @@ ${title}
 ${description || ''}
 
 ---
-【自动执行规则 - 必须遵守】
-1. 任务完成后，在回复的最后单独一行输出：${TASK_COMPLETION_MARKER}
-2. 不要调用 AskUserQuestion 工具，不要让用户选择方案，直接选择最优方案执行。
-3. 遇到问题自己判断并解决，不要中断流程等待用户输入。
+[AUTO-EXECUTE RULES - MUST FOLLOW]
+1. When task is complete, output the following marker on a separate line at the end of your response: ${TASK_COMPLETION_MARKER}
+2. Do NOT call AskUserQuestion tool. Do NOT ask user to choose options. Directly select and execute the best approach.
+3. Solve problems autonomously. Do NOT interrupt the workflow to wait for user input.
 `.trim();
 }
 
@@ -49,21 +49,13 @@ export function useAutoExecuteTask(
   // Execute a single task
   const executeTask = useCallback(
     (taskId: string) => {
-      console.log('[AutoExecute] executeTask called', {
-        taskId,
-        worktreePath,
-        enabledAgentsCount: enabledAgents?.length,
-      });
-
       if (!worktreePath || !enabledAgents || enabledAgents.length === 0) {
-        console.warn('[AutoExecute] executeTask early return', { worktreePath, enabledAgents });
         return;
       }
 
       const tasks = useTodoStore.getState().tasks[repoPath] ?? [];
       const task = tasks.find((t) => t.id === taskId);
       if (!task) {
-        console.warn('[AutoExecute] Task not found', taskId);
         stopAutoExecute(repoPath);
         return;
       }
@@ -73,7 +65,6 @@ export function useAutoExecuteTask(
 
       // Use default agent or first available
       const agent = enabledAgents.find((a) => a.isDefault) ?? enabledAgents[0];
-      console.log('[AutoExecute] Creating session for task', { taskId, agentId: agent.agentId });
 
       const sessionId = crypto.randomUUID();
 
@@ -151,16 +142,20 @@ export function useAutoExecuteTask(
       const currentTaskId = currentAutoExecute.currentTaskId;
       if (!currentTaskId) return;
 
-      console.log('[AutoExecute] Agent stopped, marking task as done');
+      // Check task completion status
+      if (data.taskCompletionStatus === 'completed') {
+        // Task completed successfully - mark as done and advance
+        updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
 
-      // All stops are treated as completion - mark done and advance
-      updateTask(repoPath, currentTaskId, { status: 'done', sessionId: undefined });
-
-      // Advance to next task
-      const nextTaskId = advanceQueue(repoPath);
-      if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
-        executeTaskRef.current(nextTaskId);
+        const nextTaskId = advanceQueue(repoPath);
+        if (nextTaskId && enabledAgents && enabledAgents.length > 0) {
+          executeTaskRef.current(nextTaskId);
+        } else {
+          stopAutoExecute(repoPath);
+        }
       } else {
+        // Task failed or unknown - stop auto-execute, reset task to todo
+        updateTask(repoPath, currentTaskId, { status: 'todo', sessionId: undefined });
         stopAutoExecute(repoPath);
       }
     },
@@ -174,17 +169,7 @@ export function useAutoExecuteTask(
   // Start auto-execute with a list of tasks
   const startAutoExecute = useCallback(
     (taskIds: string[]) => {
-      console.log('[AutoExecute] startAutoExecute called', {
-        taskIdsCount: taskIds.length,
-        enabledAgentsCount: enabledAgents?.length,
-        worktreePath,
-      });
-
       if (taskIds.length === 0 || !enabledAgents || enabledAgents.length === 0) {
-        console.warn('[AutoExecute] startAutoExecute early return', {
-          taskIdsLength: taskIds.length,
-          enabledAgents,
-        });
         return;
       }
 
@@ -196,7 +181,7 @@ export function useAutoExecuteTask(
       // Execute first task
       executeTask(firstTaskId);
     },
-    [repoPath, enabledAgents, executeTask, worktreePath]
+    [repoPath, enabledAgents, executeTask]
   );
 
   // Stop auto-execute

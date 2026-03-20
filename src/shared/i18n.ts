@@ -1347,9 +1347,9 @@ export const zhTranslations: Record<string, string> = {
   // Auto Execute
   'Auto Execute': '自动执行',
   'Executing...': '执行中...',
-  'Queue: {count}': '队列: {count}',
+  'Queue: {{count}}': '队列: {{count}}',
   Queue: '队列',
-  '{count} more': '还有 {count} 个',
+  '{{count}} more': '还有 {{count}} 个',
   // Git Clone Settings
   'Git Clone': 'Git 克隆',
   'Base directory': '基础目录',

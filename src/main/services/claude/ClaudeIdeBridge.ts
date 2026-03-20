@@ -221,7 +221,7 @@ export async function startClaudeIdeBridge(
       req.on('data', (chunk) => {
         body += chunk.toString();
       });
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const data = JSON.parse(body);
           const sessionId = data.session_id;
@@ -319,12 +319,12 @@ export async function startClaudeIdeBridge(
               // Stop event - agent has finished or been stopped
               console.log(`[ClaudeIdeBridge] → completed (Stop) ${sessionId?.slice(0, 8)}`);
 
-              // Check for task completion marker in session log
+              // Check for task completion marker in session log (async)
               let taskCompletionStatus: 'completed' | 'unknown' = 'unknown';
 
               if (data.cwd) {
                 try {
-                  const lastMessages = readLastAssistantMessages(data.cwd, sessionId, 3);
+                  const lastMessages = await readLastAssistantMessages(data.cwd, sessionId, 3);
                   if (lastMessages.length > 0) {
                     const result = checkTaskCompletion(lastMessages);
                     if (result.completed) {

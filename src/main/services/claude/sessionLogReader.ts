@@ -1,4 +1,4 @@
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { TASK_COMPLETION_MARKER } from '@shared/types/agent';
@@ -17,10 +17,13 @@ function getClaudeProjectsDir(): string {
 /**
  * Convert a working directory path to Claude's project directory format
  * e.g., "/Users/foo/project" -> "-Users-foo-project"
+ * Windows: "C:\Users\foo\project" -> "-C-Users-foo-project"
  */
 function cwdToProjectDir(cwd: string): string {
-  // Claude uses the path with leading slash replaced by dash, and remaining slashes as dashes
-  return `-${cwd.replace(/^\//, '').replace(/\//g, '-')}`;
+  // Normalize path separators for cross-platform compatibility
+  const normalized = cwd.replace(/\\/g, '/');
+  // Remove leading slash, replace colons (Windows drive letters), replace slashes with dashes
+  return `-${normalized.replace(/^\//, '').replace(/:/g, '').replace(/\//g, '-')}`;
 }
 
 /**
@@ -43,15 +46,15 @@ interface SessionLogEntry {
  * Read the last N assistant text messages from a session log file
  * Returns empty array if file doesn't exist or on error
  */
-export function readLastAssistantMessages(
+export async function readLastAssistantMessages(
   cwd: string,
   sessionId: string,
   count: number = 3
-): string[] {
+): Promise<string[]> {
   const logPath = getSessionLogPath(cwd, sessionId);
 
   try {
-    const fileContent = fs.readFileSync(logPath, 'utf-8');
+    const fileContent = await fs.readFile(logPath, 'utf-8');
     const lines = fileContent.trim().split('\n');
     const messages: string[] = [];
 
