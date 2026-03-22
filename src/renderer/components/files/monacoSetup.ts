@@ -90,6 +90,43 @@ for (const lang of SHIKI_LANGUAGES) {
   monaco.languages.register({ id: lang, extensions: [`.${lang}`] });
 }
 
+// Configure comment rules for all languages (enables Ctrl+/ / Cmd+/ shortcut)
+const C_STYLE = { comments: { lineComment: '//', blockComment: ['/*', '*/'] } };
+const SHELL_STYLE = { comments: { lineComment: '#', blockComment: null } };
+const HTML_STYLE = { comments: { lineComment: null, blockComment: ['<!--', '-->'] } };
+
+const LANGUAGE_COMMENTS: Record<string, monaco.languages.LanguageConfiguration> = {
+  ...Object.fromEntries(
+    [
+      'typescript',
+      'javascript',
+      'java',
+      'kotlin',
+      'go',
+      'rust',
+      'swift',
+      'scss',
+      'svelte',
+      'astro',
+      'json',
+    ].map((lang) => [lang, C_STYLE])
+  ),
+  css: { comments: { lineComment: null, blockComment: ['/*', '*/'] } },
+  sql: { comments: { lineComment: '--', blockComment: ['/*', '*/'] } },
+  ...Object.fromEntries(
+    ['python', 'shell', 'yaml', 'graphql', 'ini'].map((lang) => [lang, SHELL_STYLE])
+  ),
+  ...Object.fromEntries(['html', 'xml', 'markdown'].map((lang) => [lang, HTML_STYLE])),
+};
+
+for (const [langId, config] of Object.entries(LANGUAGE_COMMENTS)) {
+  try {
+    monaco.languages.setLanguageConfiguration(langId, config);
+  } catch {
+    // Language may not be registered, skip silently
+  }
+}
+
 // Save original setTheme before shikiToMonaco patches it
 const originalSetTheme = monaco.editor.setTheme.bind(monaco.editor);
 
@@ -604,6 +641,122 @@ monaco.languages.registerFoldingRangeProvider('java', {
     return computeJavaFoldingRanges(lines) as monaco.languages.FoldingRange[];
   },
 });
+
+// SFC (Single File Component) smart comment support for Vue/Svelte/Astro
+const SFC_SECTIONS = ['template', 'script', 'style'] as const;
+type SFCSection = (typeof SFC_SECTIONS)[number];
+type CommentTokens = { line: string | null; block: [string, string] };
+
+const SFC_COMMENT_TOKENS: Record<SFCSection, CommentTokens> = {
+  template: { line: null, block: ['<!--', '-->'] },
+  script: { line: '//', block: ['/*', '*/'] },
+  style: { line: null, block: ['/*', '*/'] },
+};
+
+const SFC_SECTION_REGEXES = {
+  template: { open: /<template[^>]*>/gi, close: /<\/template>/i },
+  script: { open: /<script[^>]*>/gi, close: /<\/script>/i },
+  style: { open: /<style[^>]*>/gi, close: /<\/style>/i },
+} as const;
+
+function detectSFCSection(text: string, offset: number): SFCSection {
+  const beforeCursor = text.slice(0, offset);
+  const afterCursor = text.slice(offset);
+  let lastMatch: { type: SFCSection; pos: number } | null = null;
+
+  for (const section of SFC_SECTIONS) {
+    const { open, close } = SFC_SECTION_REGEXES[section];
+    open.lastIndex = 0;
+    const match = open.exec(beforeCursor);
+    if (match && close.test(afterCursor)) {
+      if (!lastMatch || match.index > lastMatch.pos) {
+        lastMatch = { type: section, pos: match.index };
+      }
+    }
+  }
+  return lastMatch?.type ?? 'template';
+}
+
+const ESCAPED_COMMENT_TOKENS: Record<SFCSection, { line: string | null; block: [string, string] }> =
+  {
+    template: {
+      line: null,
+      block: ['<!--', '-->'].map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) as [
+        string,
+        string,
+      ],
+    },
+    script: {
+      line: '//',
+      block: ['/*', '*/'].map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) as [string, string],
+    },
+    style: {
+      line: null,
+      block: ['/*', '*/'].map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) as [string, string],
+    },
+  };
+
+function uncommentLine(line: string, tokens: CommentTokens, section: SFCSection): string {
+  if (tokens.line) return line.replace(new RegExp(`^(\\s*)${tokens.line}\\s?`), '$1');
+  const [open, close] = ESCAPED_COMMENT_TOKENS[section].block;
+  return line
+    .replace(new RegExp(`^(\\s*)${open}\\s?`), '$1')
+    .replace(new RegExp(`\\s?${close}(\\s*)$`), '$1');
+}
+
+function commentLine(line: string, tokens: CommentTokens): string {
+  const indent = line.match(/^\s*/)?.[0] ?? '';
+  const content = line.slice(indent.length);
+  return tokens.line
+    ? `${indent}${tokens.line} ${content}`
+    : `${indent}${tokens.block[0]} ${content} ${tokens.block[1]}`;
+}
+
+function registerSFCCommentAction(languageId: string) {
+  monaco.editor.addEditorAction({
+    id: `${languageId}-toggle-comment`,
+    label: 'Toggle Line Comment',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash],
+    precondition: `editorLangId == ${languageId}`,
+    run(editor) {
+      const model = editor.getModel();
+      if (!model) return;
+      const selection = editor.getSelection();
+      if (!selection) return;
+
+      const offset = model.getOffsetAt(selection.getStartPosition());
+      const section = detectSFCSection(model.getValue(), offset);
+      const tokens = SFC_COMMENT_TOKENS[section];
+      const startLine = selection.startLineNumber;
+      const endLine = selection.endLineNumber;
+
+      let allCommented = true;
+      for (let i = startLine; i <= endLine; i++) {
+        const trimmed = model.getLineContent(i).trim();
+        const isCommented = tokens.line
+          ? trimmed.startsWith(tokens.line)
+          : trimmed.startsWith(tokens.block[0]) && trimmed.endsWith(tokens.block[1]);
+        if (!isCommented) {
+          allCommented = false;
+          break;
+        }
+      }
+
+      const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
+      for (let i = startLine; i <= endLine; i++) {
+        const line = model.getLineContent(i);
+        const newLine = allCommented
+          ? uncommentLine(line, tokens, section)
+          : commentLine(line, tokens);
+        if (newLine !== line)
+          edits.push({ range: new monaco.Range(i, 1, i, line.length + 1), text: newLine });
+      }
+      editor.executeEdits(`${languageId}-toggle-comment`, edits);
+    },
+  });
+}
+
+['vue', 'svelte', 'astro'].forEach(registerSFCCommentAction);
 
 export type Monaco = typeof monaco;
 export { monaco };
